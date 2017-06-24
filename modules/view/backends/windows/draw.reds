@@ -1,7 +1,7 @@
 Red/System [
 	Title:	"DRAW Direct2D Backend"
 	Author: "Xie Qingtian"
-	File: 	%draw-d2d.reds
+	File: 	%draw.reds
 	Tabs: 	4
 	Rights: "Copyright (C) 2016 Qingtian Xie. All rights reserved."
 	License: {
@@ -12,7 +12,7 @@ Red/System [
 
 #include %text-box.reds
 
-draw-begin-d2d: func [
+draw-begin: func [
 	ctx			[draw-ctx!]
 	hWnd		[handle!]
 	/local
@@ -30,8 +30,13 @@ draw-begin-d2d: func [
 		target	[int-ptr!]
 		brushes [int-ptr!]
 ][
-	target: get-hwnd-render-target hWnd
+	zero-memory as byte-ptr! ctx size? draw-ctx!
+	ctx/pen-width:	as float32! 1.0
+	ctx/pen?:		yes
+	ctx/hwnd:		hWnd
+	ctx/font-color:	-1
 
+	target: get-hwnd-render-target hWnd
 	this: as this! target/value
 	ctx/dc: as handle! this
 	ctx/brushes: target
@@ -59,7 +64,7 @@ draw-begin-d2d: func [
 	ctx/pen: brush
 ]
 
-clean-draw-d2d: func [
+release-d2d: func [
 	ctx		[draw-ctx!]
 	/local
 		IUnk [IUnknown]
@@ -68,7 +73,7 @@ clean-draw-d2d: func [
 	;;TBD release all brushes when D2DERR_RECREATE_TARGET or exit the process
 ]
 
-draw-end-d2d: func [
+draw-end: func [
 	ctx		[draw-ctx!]
 	hWnd	[handle!]
 	/local
@@ -80,7 +85,7 @@ draw-end-d2d: func [
 	rt: as ID2D1HwndRenderTarget this/vtbl
 	hr: rt/EndDraw this null null
 
-	clean-draw-d2d ctx
+	release-d2d ctx
 
 	switch hr [
 		COM_S_OK [ValidateRect hWnd null]
@@ -95,7 +100,7 @@ draw-end-d2d: func [
 	]
 ]
 
-OS-draw-pen-d2d: func [
+OS-draw-pen: func [
 	ctx		[draw-ctx!]
 	color	[integer!]
 	off?	[logic!]
@@ -114,32 +119,7 @@ OS-draw-pen-d2d: func [
 	]
 ]
 
-OS-draw-circle-d2d: func [
-	ctx	   [draw-ctx!]
-	center [red-pair!]
-	radius [red-integer!]
-	/local
-		this	[this!]
-		rt		[ID2D1HwndRenderTarget]
-		ellipse [D2D1_ELLIPSE]
-][
-	this: as this! ctx/dc
-	rt: as ID2D1HwndRenderTarget this/vtbl
-
-	ellipse: declare D2D1_ELLIPSE
-	ellipse/x: as float32! center/x
-	ellipse/y: as float32! center/y
-	ellipse/radiusX: get-float32 radius
-	ellipse/radiusY: ellipse/radiusX
-	if ctx/brush? [
-		rt/FillEllipse this ellipse ctx/brush
-	]
-	if ctx/pen? [
-		rt/DrawEllipse this ellipse ctx/pen ctx/pen-width ctx/pen-style
-	]
-]
-
-OS-draw-text-d2d: func [
+OS-draw-text: func [
 	ctx		[draw-ctx!]
 	pos		[red-pair!]
 	text	[red-string!]
@@ -173,9 +153,401 @@ OS-draw-text-d2d: func [
 			OS-text-box-layout as red-object! text ctx/brushes yes
 		]
 	][
-		0
+		exit
 	]
 
 	txt-box-draw-background ctx/brushes pos layout
 	rt/DrawTextLayout this as float32! pos/x as float32! pos/y layout ctx/pen 0
+]
+
+
+OS-draw-shape-beginpath: func [
+	ctx			[draw-ctx!]
+][
+
+]
+
+OS-draw-shape-endpath: func [
+	ctx			[draw-ctx!]
+	close?		[logic!]
+	return:		[logic!]
+][
+
+]
+
+OS-draw-shape-close: func [
+	ctx		[draw-ctx!]
+][
+
+]
+
+OS-draw-shape-moveto: func [
+	ctx		[draw-ctx!]
+	coord	[red-pair!]
+	rel?	[logic!]
+][
+
+]
+
+OS-draw-shape-line: func [
+	ctx			[draw-ctx!]
+	start		[red-pair!]
+	end			[red-pair!]
+	rel?		[logic!]
+][
+
+]
+
+OS-draw-shape-axis: func [
+	ctx			[draw-ctx!]
+	start		[red-value!]
+	end			[red-value!]
+	rel?		[logic!]
+	hline		[logic!]
+][
+
+]
+
+OS-draw-shape-curve: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+	rel?	[logic!]
+][
+
+]
+
+OS-draw-shape-qcurve: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+	rel?	[logic!]
+][
+
+]
+
+OS-draw-shape-curv: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+	rel?	[logic!]
+][
+
+]
+
+OS-draw-shape-qcurv: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+	rel?	[logic!]
+][
+
+]
+
+OS-draw-shape-arc: func [
+	ctx		[draw-ctx!]
+	end		[red-pair!]
+	sweep?	[logic!]
+	large?	[logic!]
+	rel?	[logic!]
+][
+
+]
+
+OS-draw-anti-alias: func [
+	ctx [draw-ctx!]
+	on? [logic!]
+][
+
+]
+
+OS-draw-line: func [
+	ctx	   [draw-ctx!]
+	point  [red-pair!]
+	end	   [red-pair!]
+][
+
+]
+
+OS-draw-fill-pen: func [
+	ctx		[draw-ctx!]
+	color	[integer!]									;-- 00bbggrr format
+	off?	[logic!]
+	alpha?	[logic!]
+][
+
+]
+
+OS-draw-line-width: func [
+	ctx			[draw-ctx!]
+	width		[red-value!]
+][
+
+]
+
+OS-draw-box: func [
+	ctx			[draw-ctx!]
+	upper		[red-pair!]
+	lower		[red-pair!]
+][
+
+]
+
+OS-draw-triangle: func [		;@@ TBD merge this function with OS-draw-polygon
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+][
+
+]
+
+OS-draw-polygon: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+][
+
+]
+
+OS-draw-spline: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+	closed? [logic!]
+][
+
+]
+
+do-draw-ellipse: func [
+	ctx		[draw-ctx!]
+	x		[integer!]
+	y		[integer!]
+	width	[integer!]
+	height	[integer!]
+][
+
+]
+
+OS-draw-circle: func [
+	ctx	   [draw-ctx!]
+	center [red-pair!]
+	radius [red-integer!]
+	/local
+		this	[this!]
+		rt		[ID2D1HwndRenderTarget]
+		ellipse [D2D1_ELLIPSE]
+][
+	this: as this! ctx/dc
+	rt: as ID2D1HwndRenderTarget this/vtbl
+
+	ellipse: declare D2D1_ELLIPSE
+	ellipse/x: as float32! center/x
+	ellipse/y: as float32! center/y
+	ellipse/radiusX: get-float32 radius
+	ellipse/radiusY: ellipse/radiusX
+	if ctx/brush? [
+		rt/FillEllipse this ellipse ctx/brush
+	]
+	if ctx/pen? [
+		rt/DrawEllipse this ellipse ctx/pen ctx/pen-width ctx/pen-style
+	]
+]
+
+OS-draw-ellipse: func [
+	ctx		 [draw-ctx!]
+	upper	 [red-pair!]
+	diameter [red-pair!]
+][
+
+]
+
+OS-draw-font: func [
+	ctx		[draw-ctx!]
+	font	[red-object!]
+][
+
+]
+
+OS-draw-arc: func [
+	ctx	   [draw-ctx!]
+	center [red-pair!]
+	end	   [red-value!]
+][
+
+]
+
+OS-draw-curve: func [
+	ctx		[draw-ctx!]
+	start	[red-pair!]
+	end		[red-pair!]
+][
+
+]
+
+OS-draw-line-join: func [
+	ctx		[draw-ctx!]
+	style	[integer!]
+][
+
+]
+
+OS-draw-line-cap: func [
+	ctx		[draw-ctx!]
+	style	[integer!]
+][
+
+]
+
+OS-draw-image: func [
+	ctx			[draw-ctx!]
+	image		[red-image!]
+	start		[red-pair!]
+	end			[red-pair!]
+	key-color	[red-tuple!]
+	border?		[logic!]
+	crop1		[red-pair!]
+	pattern		[red-word!]
+][
+
+]
+
+
+OS-draw-brush-bitmap: func [
+	ctx		[draw-ctx!]
+	img		[red-image!]
+	crop-1	[red-pair!]
+	crop-2	[red-pair!]
+	mode	[red-word!]
+	brush?	[logic!]
+][
+
+]
+
+OS-draw-brush-pattern: func [
+	ctx		[draw-ctx!]
+	size	[red-pair!]
+	crop-1	[red-pair!]
+	crop-2	[red-pair!]
+	mode	[red-word!]
+	block	[red-block!]
+	brush?	[logic!]
+][
+
+]
+
+
+OS-draw-grad-pen-old: func [
+	ctx			[draw-ctx!]
+	type		[integer!]
+	mode		[integer!]
+	offset		[red-pair!]
+	count		[integer!]					;-- number of the colors
+	brush?		[logic!]
+][
+
+]
+
+OS-draw-grad-pen: func [
+	ctx			[draw-ctx!]
+	mode		[integer!]
+	stops		[red-value!]
+	count		[integer!]
+	skip-pos	[logic!]
+	positions	[red-value!]
+	focal?		[logic!]
+	spread		[integer!]
+	brush?		[logic!]
+][
+
+]
+
+OS-set-clip: func [
+	ctx		[draw-ctx!]
+	u		[red-pair!]
+	l		[red-pair!]
+	rect?	[logic!]
+	mode	[integer!]
+][
+
+]
+
+OS-matrix-rotate: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+	angle		[red-integer!]
+	center		[red-pair!]
+][
+
+]
+
+OS-matrix-scale: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+	sx			[red-integer!]
+	sy			[red-integer!]
+][
+
+]
+
+OS-matrix-translate: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+	x			[integer!]
+	y			[integer!]
+][
+
+]
+
+OS-matrix-skew: func [
+	ctx		    [draw-ctx!]
+	pen-fill    [integer!]
+	sx			[red-integer!]
+	sy			[red-integer!]
+][
+
+]
+
+OS-matrix-transform: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+	center		[red-pair!]
+	scale		[red-integer!]
+	translate	[red-pair!]
+][
+	
+]
+
+OS-matrix-push: func [ctx [draw-ctx!] state [int-ptr!]][
+
+]
+
+OS-matrix-pop: func [ctx [draw-ctx!] state [integer!]][]
+
+OS-matrix-reset: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+][
+	
+]
+
+OS-matrix-invert: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+
+][
+
+]
+
+OS-matrix-set: func [
+	ctx			[draw-ctx!]
+	pen-fill	[integer!]
+	blk			[red-block!]
+][
+	
+]
+
+OS-set-matrix-order: func [
+	ctx		[draw-ctx!]
+	order	[integer!]
+][
+
 ]

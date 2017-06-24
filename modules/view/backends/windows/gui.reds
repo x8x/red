@@ -45,8 +45,11 @@ Red/System [
 #include %tab-panel.reds
 #include %text-list.reds
 #include %button.reds
-#include %draw-d2d.reds
-#include %draw.reds
+#either legacy = none [
+	#include %draw.reds
+][
+	#include %draw-gdi.reds ;-- for WinXP
+]
 #include %comdlgs.reds
 
 exit-loop:		0
@@ -847,10 +850,6 @@ get-flags: func [
 			sym = popup		 [flags: flags or FACET_FLAGS_POPUP]
 			sym = editable   [flags: flags or FACET_FLAGS_EDITABLE]
 			sym = scrollable [flags: flags or FACET_FLAGS_SCROLLABLE]
-			all [
-				sym = Direct2D
-				d2d-factory <> null
-			]				 [flags: flags or FACET_FLAGS_D2D]
 			true			 [fire [TO_ERROR(script invalid-arg) word]]
 		]
 		word: word + 1
@@ -1259,6 +1258,7 @@ OS-make-view: func [
 		]
 		sym = base [
 			class: #u16 "RedBase"
+			if d2d-factory <> null [bits: bits or FACET_FLAGS_D2D]
 			alpha?: transparent-base?
 				as red-tuple! values + FACE_OBJ_COLOR
 				as red-image! values + FACE_OBJ_IMAGE
@@ -1277,6 +1277,7 @@ OS-make-view: func [
 		]
 		sym = window [
 			class: #u16 "RedWindow"
+			if d2d-factory <> null [bits: bits or FACET_FLAGS_D2D]
 			flags: WS_BORDER or WS_CLIPCHILDREN
 			;ws-flags: WS_EX_COMPOSITED
 			if bits and FACET_FLAGS_NO_MIN  = 0 [flags: flags or WS_MINIMIZEBOX]
@@ -1418,7 +1419,7 @@ OS-make-view: func [
 	]
 	if TYPE_OF(rate) <> TYPE_NONE [change-rate handle rate]
 
-	SetWindowLong handle wc-offset + 16 get-flags as red-block! values + FACE_OBJ_FLAGS
+	SetWindowLong handle wc-offset + 16 bits
 	stack/unwind
 	as-integer handle
 ]
