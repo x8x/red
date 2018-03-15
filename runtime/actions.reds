@@ -428,18 +428,21 @@ actions: context [
 			op <> COMP_SAME
 			op <> COMP_STRICT_EQUAL
 			op <> COMP_NOT_EQUAL
+			op <> COMP_FIND
 		][
 			fire [TO_ERROR(script invalid-compare) value1 value2]
 		]
 		switch op [
 			COMP_EQUAL
+			COMP_FIND
 			COMP_SAME
-			COMP_STRICT_EQUAL 	[res: value =  0]
-			COMP_NOT_EQUAL 		[res: value <> 0]
-			COMP_LESSER			[res: value <  0]
-			COMP_LESSER_EQUAL	[res: value <= 0]
-			COMP_GREATER		[res: value >  0]
-			COMP_GREATER_EQUAL	[res: value >= 0]
+			COMP_STRICT_EQUAL
+			COMP_STRICT_EQUAL_WORD	[res: value =  0]
+			COMP_NOT_EQUAL 			[res: value <> 0]
+			COMP_LESSER				[res: value <  0]
+			COMP_LESSER_EQUAL		[res: value <= 0]
+			COMP_GREATER			[res: value >  0]
+			COMP_GREATER_EQUAL		[res: value >= 0]
 		]
 		res
 	]
@@ -1580,7 +1583,26 @@ actions: context [
 	
 	open*: func [][]
 	open?*: func [][]
-	query*: func [][]
+
+	query*: func [][
+		stack/set-last query stack/arguments
+	]
+
+	query: func [
+		target  [red-value!]
+		return:	[red-value!]
+		/local
+			action-query
+	][
+		#if debug? = yes [if verbose > 0 [print-line "actions/query"]]
+
+		action-query: as function! [
+			target  [red-value!]
+			return:	[red-value!]						;-- picked value from series
+		] get-action-ptr target ACT_QUERY
+
+		action-query target
+	]
 
 	read*: func [
 		part	[integer!]
@@ -1757,7 +1779,7 @@ actions: context [
 			:modify*
 			null			;open
 			null			;open?
-			null			;query
+			:query*
 			:read*
 			null			;rename
 			null			;update

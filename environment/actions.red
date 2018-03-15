@@ -94,9 +94,9 @@ absolute: make action! [[
 
 add: make action! [[
 		"Returns the sum of the two values"
-		value1	 [number! char! pair! tuple! vector! time!]
-		value2	 [number! char! pair! tuple! vector! time!]
-		return:  [number! char! pair! tuple! vector! time!]
+		value1	 [number! char! pair! tuple! vector! time! date!]
+		value2	 [number! char! pair! tuple! vector! time! date!]
+		return:  [number! char! pair! tuple! vector! time! date!]
 	]
 	#get-definition ACT_ADD
 ]
@@ -162,9 +162,9 @@ round: make action! [[
 
 subtract: make action! [[
 		"Returns the difference between two values"
-		value1	 [number! char! pair! tuple! vector! time!]
-		value2	 [number! char! pair! tuple! vector! time!]
-		return:  [number! char! pair! tuple! vector! time!]
+		value1	 [number! char! pair! tuple! vector! time! date!]
+		value2	 [number! char! pair! tuple! vector! time! date!]
+		return:  [number! char! pair! tuple! vector! time! date!]
 	]
 	#get-definition ACT_SUBTRACT
 ]
@@ -329,7 +329,7 @@ head?: make action! [[
 
 index?: make action! [[
 		"Returns the current index of series relative to the head, or of word in a context"
-		series	 [series! word!]
+		series	 [series! any-word!]
 		return:  [integer!]
 	]
 	#get-definition ACT_INDEX?
@@ -378,7 +378,7 @@ next: make action! [[
 
 pick: make action! [[
 		"Returns the series value at a given index"
-		series	 [series! bitset! pair! tuple! time!]
+		series	 [series! bitset! pair! tuple! date! time!]
 		index 	 [scalar! any-string! any-word! block! logic! time!]
 		return:  [any-type!]
 	]
@@ -398,7 +398,7 @@ poke: make action! [[
 put: make action! [[
 		"Replaces the value following a key, and returns the new value"
 		series	 [series! map! object!]
-		key 	 [scalar! any-string! any-word!]
+		key 	 [scalar! any-string! any-word! binary!]
 		value 	 [any-type!]
 		/case "Perform a case-sensitive search"
 		return:  [series! map! object!]
@@ -512,14 +512,14 @@ take: make action! [[
 
 trim: make action! [[
 		"Removes space from a string or NONE from a block"
-		series	[string! block! hash!]
+		series	[series!]
 		/head	"Removes only from the head"
 		/tail	"Removes only from the tail"
 		/auto	"Auto indents lines relative to first line"
 		/lines	"Removes all line breaks and extra spaces"
 		/all	"Removes all whitespace"
 		/with	"Same as /all, but removes characters in 'str'"
-			str [char! string! integer!]
+			str [char! string! binary! integer!]
 	]
 	#get-definition ACT_TRIM
 ]
@@ -537,7 +537,13 @@ delete: make action! [[
 ]
 ;open
 ;open?
-;query
+query: make action! [[
+		"Returns information about a file"
+		target [file!]
+	]
+	#get-definition ACT_QUERY
+]
+
 read: make action! [[
 		"Reads from a file, URL, or other port"
 		source	[file! url!]

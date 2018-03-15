@@ -106,6 +106,12 @@ redc: context [
 				]
 			]
 		][												;-- Linux (default)
+			cpuinfo: attempt [read %/proc/cpuinfo]
+			either cpuinfo [
+				SSE3?: parse cpuinfo [thru "flags" to "sse3" to end]
+			][
+				fail "Can't read /proc/cpuinfo"
+			]
 			any [
 				exists? libc: %libc.so.6
 				exists? libc: %/lib32/libc.so.6
@@ -137,7 +143,7 @@ redc: context [
 			parse/all buf [[thru "[" | thru "Version" | thru "ver" | thru "v" | thru "indows"] to #"." pos:]
 			
 			win-version: any [
-				attempt [load copy/part back remove pos 2]
+				attempt [load copy/part back back remove pos 3]
 				0
 			]
 		]
@@ -198,6 +204,14 @@ redc: context [
 			build-date/month "-"
 			build-date/day   "-"
 			to-integer build-date/time
+		]
+	]
+	
+	get-lib-suffix: does [
+		case [
+			Windows? 			 [%.dll]
+			system/version/4 = 2 [%.dylib]
+			'else 				 [%.so]
 		]
 	]
 
@@ -365,11 +379,7 @@ redc: context [
 			script: %crush.reds
 			copy %crush
 		]
-		filename: append temp-dir/:basename case [
-			Windows? 			 [%.dll]
-			system/version/4 = 2 [%.dylib]
-			'else 				 [%.so]
-		]
+		filename: append temp-dir/:basename get-lib-suffix
 
 		if any [
 			not exists? filename
@@ -570,7 +580,6 @@ redc: context [
 				"...output file      :" to-local-file result/4 lf
 			]
 		]
-		unless Windows? [print ""]						;-- extra LF for more readable output
 	]
 	
 	do-clear: func [args [block!] /local path file][
@@ -668,6 +677,7 @@ redc: context [
 			any [
 				  ["-c" | "--compile"]			(type: 'exe)
 				| ["-r" | "--release"]			(type: 'exe opts/dev-mode?: no)
+				| ["-e" | "--encap"]			(opts/encap?: yes)
 				| ["-d" | "--debug-stabs" | "--debug"]	(opts/debug?: yes)
 				| ["-o" | "--output"]			[set output  skip | (fail "Missing output filename")]
 				| ["-t" | "--target"]			[set target  skip | (fail "Missing target")] (target?: yes)
@@ -825,7 +835,7 @@ redc: context [
 		result
 	]
 
-	main: func [/with cmd [string!] /local src opts build-dir prefix result][
+	main: func [/with cmd [string!] /local src opts build-dir prefix result file][
 		set [src opts] parse-options cmd
 		unless src [do opts exit]						;-- run named command and terminates
 
@@ -843,6 +853,9 @@ redc: context [
 
 		;-- libRedRT updating mode
 		if opts/libRedRT-update? [
+			if exists? file: rejoin [get-output-path opts %libRedRT get-lib-suffix][
+				delete file
+			]
 			opts/dev-mode?: opts/link?: no
 			compile src opts
 			print ["libRedRT-extras.r file generated, recompiling..." lf]
@@ -850,7 +863,16 @@ redc: context [
 			opts/libRedRT-update?: no
 		]
 		
-		if result: compile src opts [show-stats result]
+		if result: compile src opts [
+			show-stats result
+			if all [word: in opts 'packager get word][
+				file: join %system/formats/ [opts/packager %.r]
+				unless exists?-cache file [fail ["Packager:" opts/packager "not found!"]]
+				do bind load-cache file 'self
+				packager/process opts src result/4
+			]
+			unless Windows? [print ""]					;-- extra LF for more readable output
+		]
 	]
 
 	set 'rc func [cmd [file! string! block!]][

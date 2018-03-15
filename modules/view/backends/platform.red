@@ -23,7 +23,7 @@ system/view/platform: context [
 				FACE_OBJ_COLOR
 				FACE_OBJ_MENU
 				FACE_OBJ_DATA
-				FACE_OBJ_ENABLE?
+				FACE_OBJ_ENABLED?
 				FACE_OBJ_VISIBLE?
 				FACE_OBJ_SELECTED
 				FACE_OBJ_FLAGS
@@ -49,7 +49,7 @@ system/view/platform: context [
 				FACET_FLAG_COLOR:		00000020h
 				FACET_FLAG_MENU:		00000040h
 				FACET_FLAG_DATA:		00000080h
-				FACET_FLAG_ENABLE?:		00000100h
+				FACET_FLAG_ENABLED?:	00000100h
 				FACET_FLAG_VISIBLE?:	00000200h
 				FACET_FLAG_SELECTED:	00000400h
 				FACET_FLAG_FLAGS:		00000800h
@@ -205,7 +205,7 @@ system/view/platform: context [
 				color:		symbol/make "color"
 				menu:		symbol/make "menu"
 				data:		symbol/make "data"
-				enable?:	symbol/make "enable?"
+				enabled?:	symbol/make "enabled?"
 				visible?:	symbol/make "visible?"
 				selected:	symbol/make "selected"
 				flags:		symbol/make "flags"
@@ -270,7 +270,7 @@ system/view/platform: context [
 			_backdrop:		symbol/make "backdrop"
 			_font-name:		symbol/make "font-name"
 			_font-size:		symbol/make "font-size"
-			_height:		symbol/make "height"
+			_class:			symbol/make "class"
 			_regular:		symbol/make "regular"
 			_small:			symbol/make "small"
 			_mini:			symbol/make "mini"
@@ -529,7 +529,7 @@ system/view/platform: context [
 					]
 				]
 				test [#include %test/gui.reds]
-				;GTK [#include %GTK/gui.reds]
+				GTK [#include %GTK/gui.reds]
 			]
 		]
 	]
@@ -698,34 +698,49 @@ system/view/platform: context [
 
 		extend system/view/metrics/margins [#switch config/OS [
 			Windows [
-				button:		[1x1   1x1]					;-- LeftxRight TopxBottom
-				tab-panel:	[0x2   0x1]
-				text-list:	[0x0   0x15]
-				group-box:	[0x0   0x1]
+				button:			[1x1   1x1]				;-- LeftxRight TopxBottom
+				tab-panel:		[0x2   0x1]
+				group-box:		[0x0   0x1]
 			]
 			macOS [
-				button:		[6x6   2x3]
-				group-box:	[3x3   0x4]
-				tab-panel:	[7x7   6x10]
-				drop-down:	[0x3   3x0]
-				drop-list:	[0x3   3x0]
+				button:			[2x2   2x3 regular 6x6 4x7 small 5x5 4x6 mini 1x1 0x1]
+				regular:		[6x6   4x7]
+				small:			[5x5   4x6]
+				mini:			[1x1   0x1]
+				group-box:		[3x3   0x4]
+				tab-panel:		[7x7  6x10]
+				drop-down:		[0x3   2x3 regular 0x3 2x3 small 0x3 1x3 mini 0x2 1x3]
+				drop-list:		[0x3   2x3 regular 0x3 2x3 small 0x3 1x3 mini 0x2 1x3]
 			]
 		]]
 		extend system/view/metrics/paddings [#switch config/OS [
 			Windows [
-				check:		[16x0  0x0]					;-- 13 + 3 for text padding
-				radio:		[16x0  0x0]					;-- 13 + 3 for text padding
-				group-box:	[3x3  10x3]
-				tab-panel:	[1x3  25x0]
-				button:		[8x8   0x0]
+				check:			[16x0  0x0]				;-- 13 + 3 for text padding
+				radio:			[16x0  0x0]				;-- 13 + 3 for text padding
+				group-box:		[3x3  10x3]
+				tab-panel:		[1x3  25x0]
+				button:			[8x8   0x0]
 			]
 			macOS [
-				button:		[7x7   0x0]
-				check:		[20x0  3x1]
-				radio:		[20x0  1x1]
-				text:		[3x3   0x0]
-				field:		[3x3   0x0]
-				group-box:	[0x8  4x18]
+				button:			[11x11 0x0 regular 14x14 0x0 small 11x11 0x0 mini 11x11 0x0]
+				check:			[20x0  3x1]
+				radio:			[20x0  1x1]
+				text:			[3x3   0x0]
+				field:			[3x3   0x0]
+				group-box:		[0x8  4x18]
+				drop-list:		[14x26 0x0 regular 14x26 0x0 small 11x22 0x0 mini 11x22 0x0]
+			]
+		]]
+		extend system/view/metrics/def-heights [#switch config/OS [
+			Windows []
+			macOS	[
+				check:		21
+				radio:		21
+				text:		18
+				field:		21
+				drop-down:	21
+				drop-list:	21
+				progress:	21
 			]
 		]]
 		

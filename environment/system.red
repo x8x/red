@@ -51,6 +51,22 @@ system: context [
 		actions:
 		natives: none
 		
+		accessors: [
+			date!	[
+				date year month day zone time hour minute second weekday yearday
+				timezone week isoweek julian
+			]
+			email!	[user host]
+			event!	[
+				type face window offset key picked flags away? down? mid-down?
+				alt-down? aux-down? ctrl? shift?
+			]
+			image!	[size argb rgb alpha]
+			pair!	[x y]
+			;point!	[x y z]
+			time!	[hour minute second]
+		]
+		
 		errors: context [
 			throw: object [
 				code:				0
@@ -82,7 +98,7 @@ system: context [
 				no-value:			[:arg1 "has no value"]
 				need-value:			[:arg1 "needs a value"]
 				not-defined:		[:arg1 "word is not bound to a context"]
-				not-in-context:		[:arg1 "is not in the specified context"]
+				not-in-context:		["context for" :arg1 "is not available"]
 				no-arg:				[:arg1 "is missing its" :arg2 "argument"]
 				expect-arg:			[:arg1 "does not allow" :arg2 "for its" :arg3 "argument"]
 				expect-val:			["expected" :arg1 "not" :arg2]
@@ -131,11 +147,13 @@ system: context [
 				bad-bad:			[:arg1 "error:" :arg2]
 				bad-make-arg:		["cannot MAKE" :arg1 "from:" :arg2]
 				bad-to-arg:			["cannot MAKE/TO" :arg1 "from:" :arg2]
+				invalid-months:		"invalid system/locale/month list"
 				invalid-spec-field: ["invalid" :arg1 "field in spec block"]
 				missing-spec-field: [:arg1 "not found in spec block"]
 				move-bad:			["Cannot MOVE elements from" :arg1 "to" :arg2]
 				too-long:			"Content too long"
 				invalid-char:		["Invalid char! value:" :arg1]
+				bad-loop-series:	["Loop series changed to invalid value:" :arg1]
 				;bad-decode:		"missing or unsupported encoding marker"
 				;already-used:		["alias word is already in use:" :arg1]
 				;wrong-denom:		[:arg1 "not same denomination as" :arg2]
@@ -234,7 +252,7 @@ system: context [
 				feature-na:			"feature not available"
 				not-done:			"reserved for future use (or not yet implemented)"
 				invalid-error:		["invalid error object field value:" :arg1]
-				routines:			"routines require compilation, from OS shell: `red -c <script.red>`"
+				routines:			"routines require compilation, from OS shell: `red -r <script.red>`"
 				red-system:			"contains Red/System code which requires compilation"
 			]
 		]
@@ -279,7 +297,7 @@ system: context [
 	options: context [
 		boot: 			none
 		home: 			none
-		path: 			what-dir
+		path: 			to-red-file get-current-dir
 		script: 		none
 		cache:			none
 		thru-cache:		none
@@ -350,6 +368,9 @@ system: context [
 		]
 		error: context [
 			code: type: id: arg1: arg2: arg3: near: where: stack: none
+		]
+		file-info: context [
+			name: size: date: type: none
 		]
 	]
 	

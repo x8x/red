@@ -46,6 +46,7 @@ Red/System [
 
 #define DT_CENTER				0001h
 #define DT_VCENTER				0004h
+#define DT_WORDBREAK			0010h
 #define DT_SINGLELINE			0020h
 #define DT_EXPANDTABS			0040h
 #define DT_CALCRECT				0400h
@@ -127,6 +128,7 @@ Red/System [
 #define LBS_NOTIFY			1
 #define LBS_MULTIPLESEL		8
 #define LBS_SORT			2
+#define LBS_NOINTEGRALHEIGHT  0100h
 
 #define PBS_VERTICAL		04h
 
@@ -221,6 +223,7 @@ Red/System [
 #define BS_GROUPBOX			00000007h
 #define BS_AUTORADIOBUTTON	00000009h
 
+#define EM_SETSEL			000000B1h
 #define EM_SETLIMITTEXT		000000C5h
 #define EM_GETLIMITTEXT		000000D5h
 #define ES_LEFT				00000000h
@@ -301,9 +304,12 @@ Red/System [
 #define WM_EXITSIZEMOVE		0232h
 #define WM_IME_SETCONTEXT	0281h
 #define WM_IME_NOTIFY		0282h
+#define WM_MOUSELEAVE		02A3h
+#define WM_DPICHANGED		02E0h
 #define WM_COPY				0301h
 #define WM_PASTE			0302h
 #define WM_CLEAR			0303h
+#define WM_THEMECHANGED		031Ah
 
 #define WM_CAP_DRIVER_CONNECT		040Ah
 #define WM_CAP_DRIVER_DISCONNECT	040Bh
@@ -600,6 +606,13 @@ tagTEXTMETRIC: alias struct! [
 	tmCharSet			[byte!]
 ]
 
+tagTRACKMOUSEEVENT: alias struct! [
+	cbSize		[integer!]
+	dwFlags		[integer!]
+	hwndTrack	[handle!]
+	dwHoverTime	[integer!]
+]
+
 tagNMHDR: alias struct! [
 	hWndFrom	 [handle!]
 	idFrom		 [integer!]
@@ -857,6 +870,25 @@ tagLOGFONT: alias struct! [								;-- 92 bytes
 	lfFaceName8		[float!]
 ]
 
+tagNONCLIENTMETRICS: alias struct! [
+	cbSize				[integer!]
+	iBorderWidth		[integer!]
+	iScrollWidth		[integer!]
+	iScrollHeight		[integer!]
+	iCaptionWidth		[integer!]
+	iCaptionHeight		[integer!]
+	lfCaptionFont		[tagLOGFONT value]
+	iSmCaptionWidth		[integer!]
+	iSmCaptionHeight	[integer!]
+	lfSmCaptionFont		[tagLOGFONT value]
+	iMenuWidth			[integer!]
+	iMenuHeight			[integer!]
+	lfMenuFont			[tagLOGFONT value]
+	lfStatusFont		[tagLOGFONT value]
+	lfMessageFont		[tagLOGFONT value]
+	iPaddedBorderWidth	[integer!]
+]
+
 tagCHOOSEFONT: alias struct! [
 	lStructSize		[integer!]
 	hwndOwner		[int-ptr!]
@@ -915,6 +947,14 @@ tagBROWSEINFO: alias struct! [
 
 DwmIsCompositionEnabled!: alias function! [
 	pfEnabled	[int-ptr!]
+	return:		[integer!]
+]
+
+GetDpiForMonitor!: alias function! [
+	hmonitor	[handle!]
+	dpiType		[integer!]
+	dpiX		[int-ptr!]
+	dpiY		[int-ptr!]
 	return:		[integer!]
 ]
 
@@ -989,6 +1029,22 @@ XFORM!: alias struct! [
 		]
 	]
 	"User32.dll" stdcall [
+		TrackMouseEvent: "TrackMouseEvent" [
+			EventTrack	[tagTRACKMOUSEEVENT]
+			return:		[logic!]
+		]
+		RedrawWindow: "RedrawWindow" [
+			hWnd		[handle!]
+			lprcUpdate	[RECT_STRUCT]
+			hrgnUpdate	[handle!]
+			flags		[integer!]
+			return:		[logic!]
+		]
+		MonitorFromPoint: "MonitorFromPoint" [
+			pt			[tagPOINT value]
+			flags		[integer!]
+			return:		[handle!]
+		]
 		GetKeyboardLayout: "GetKeyboardLayout" [
 			idThread	[integer!]
 			return:		[integer!]
@@ -1094,7 +1150,7 @@ XFORM!: alias struct! [
 			hdcSrc		[handle!]
 			pptSrc		[tagPOINT]
 			crKey		[integer!]
-			pblend		[integer!]
+			pblend		[tagBLENDFUNCTION]
 			dwFlags		[integer!]
 			return:		[logic!]
 		]
@@ -1943,7 +1999,7 @@ XFORM!: alias struct! [
 		GdipSetImageAttributesColorKeys: "GdipSetImageAttributesColorKeys" [
 			attr		[integer!]
 			type		[integer!]
-			enable?		[logic!]
+			enabled?	[logic!]
 			colorLow	[integer!]
 			colorHigh	[integer!]
 			return:		[integer!]
@@ -2695,6 +2751,13 @@ XFORM!: alias struct! [
 			himl		[integer!]
 			hbmImage	[integer!]
 			hbmMask		[integer!]
+			return:		[integer!]
+		]
+		LBItemFromPt: "LBItemFromPt" [
+			hLB			[handle!]
+			x			[integer!]
+			y			[integer!]
+			bAutoScroll [logic!]
 			return:		[integer!]
 		]
 	]

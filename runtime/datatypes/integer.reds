@@ -235,6 +235,7 @@ integer: context [
 			TYPE_OF(right) = TYPE_TUPLE
 			TYPE_OF(right) = TYPE_TIME
 			TYPE_OF(right) = TYPE_VECTOR
+			TYPE_OF(right) = TYPE_DATE
 		]
 
 		switch TYPE_OF(right) [
@@ -268,6 +269,17 @@ integer: context [
 			]
 			TYPE_VECTOR [
 				return stack/set-last vector/do-math-scalar op as red-vector! right as red-value! left
+			]
+			TYPE_DATE [
+				either op = OP_ADD [
+					value: left/value						;-- swap them!
+					copy-cell as red-value! right as red-value! left
+					right/header: TYPE_INTEGER
+					right/value: value
+					date/do-math op
+				][
+					fire [TO_ERROR(script not-related) words/_subtract datatype/push TYPE_INTEGER]
+				]
 			]
 			default [
 				fire [TO_ERROR(script invalid-type) datatype/push TYPE_OF(right)]
@@ -373,12 +385,14 @@ integer: context [
 		/local
 			int  [red-integer!]
 			fl	 [red-float!]
+			str	 [red-string!]
 			t	 [red-time!]
-			pad1 [integer!]
-			pad2 [integer!]
-			pad3 [integer!]
-			pad4 [integer!]
-			val	 [red-value!]
+			p	 [byte-ptr!]
+			err	 [integer!]
+			i	 [integer!]
+			unit [integer!]
+			len	 [integer!]
+			s	 [series!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "integer/to"]]
 		
@@ -390,10 +404,6 @@ integer: context [
 		switch TYPE_OF(spec) [
 			TYPE_CHAR [
 				int/value: spec/data2
-			]
-			TYPE_TIME [
-				t: as red-time! spec
-				int/value: as-integer t/time / time/oneE9 + 0.5
 			]
 			TYPE_FLOAT
 			TYPE_PERCENT [
@@ -407,24 +417,25 @@ integer: context [
 			TYPE_ISSUE [
 				int/value: from-issue as red-word! spec
 			]
+			TYPE_TIME [
+				t: as red-time! spec
+				int/value: as-integer t/time + 0.5
+			]
+			TYPE_DATE [
+				int/value: date/to-epoch as red-date! spec
+			]
 			TYPE_ANY_STRING [
-				pad4: 0
-				val: as red-value! :pad4
-				copy-cell spec val					;-- save spec, load-value will change it
-
-				proto: load-value as red-string! spec
-				
-				either TYPE_OF(proto) = TYPE_FLOAT [
-					fl: as red-float! proto
-					if overflow? fl [fire [TO_ERROR(script too-long)]]
-					int: as red-integer! proto
-					int/header: TYPE_INTEGER
-					int/value: as-integer fl/value
-				][
-					if TYPE_OF(proto) <> TYPE_INTEGER [ 
-						fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_INTEGER val]
-					]
+				err: 0
+				str: as red-string! spec
+				s: GET_BUFFER(str)
+				unit: GET_UNIT(s)
+				p: (as byte-ptr! s/offset) + (str/head << log-b unit)
+				len: (as-integer s/tail - p) >> log-b unit
+				i: tokenizer/scan-integer p len unit :err
+				if err <> 0 [
+					fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_INTEGER spec]
 				]
+				int/value: i
 			]
 			default [fire [TO_ERROR(script bad-to-arg) datatype/push TYPE_INTEGER spec]]
 		]
@@ -478,7 +489,7 @@ integer: context [
 		#if debug? = yes [if verbose > 0 [print-line "integer/compare"]]
 
 		if all [
-			op = COMP_STRICT_EQUAL
+			any [op = COMP_FIND op = COMP_STRICT_EQUAL]
 			TYPE_OF(value2) <> TYPE_INTEGER
 		][return 1]
 		
@@ -604,10 +615,17 @@ integer: context [
 			base [red-integer!]
 			exp  [red-integer!]
 			f	 [red-float!]
+			type [integer!]
 			up?	 [logic!]
 	][
 		base: as red-integer! stack/arguments
 		exp: base + 1
+		type: TYPE_OF(exp)
+		
+		if all [type <> TYPE_INTEGER type <> TYPE_FLOAT][
+			ERR_EXPECT_ARGUMENT(type 1)
+		]
+		
 		up?: any [
 			TYPE_OF(exp) = TYPE_FLOAT
 			negative? exp/value

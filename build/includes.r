@@ -56,6 +56,7 @@ write %build/bin/sources.r set-cache [
 		%definitions.reds
 		%case-folding.reds
 		%interpreter.reds
+		%inflate.reds
 		%macros.reds
 		%natives.reds
 		%parse.reds
@@ -68,6 +69,7 @@ write %build/bin/sources.r set-cache [
 		%ownership.reds
 		%stack.reds
 		%tools.reds
+		%tokenizer.reds
 		%unicode.reds
 		%simple-io.reds
 		%clipboard.reds
@@ -125,6 +127,7 @@ write %build/bin/sources.r set-cache [
 			%vector.reds
 			%word.reds
 			%handle.reds
+			%date.reds
 		]
 		%platform/ [
 			%android.reds
@@ -222,7 +225,7 @@ write %build/bin/sources.r set-cache [
 			%red.ico
 			%red-3D.ico
 			%red-mono.ico
-			%osx/ [
+			%macOS/ [
 				%Info.plist
 				%Resources/ [
 					%AppIcon.icns

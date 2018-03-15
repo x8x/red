@@ -31,7 +31,7 @@ The Red toolchain comes as a single **one-megabyte** executable file that you ca
 
         $ red hello.red
 
-5. You should see the Hello World! output.
+5. You should see the _Hello World!_ output.
 
 6. Want to generate a compiled executable from that program?
 
@@ -122,33 +122,34 @@ Cross-compilation targets:
     Linux        : GNU/Linux, x86
     Linux-ARM    : GNU/Linux, ARMv5, armel (soft-float)
     RPi          : GNU/Linux, ARMv5, armhf (hard-float)
-    Darwin       : MacOSX Intel, console-only applications
+    Darwin       : macOS Intel, console-only applications
+    macOS        : macOS Intel, applications bundles
     Syllable     : Syllable OS, x86
     FreeBSD      : FreeBSD, x86
     Android      : Android, ARMv5
     Android-x86  : Android, x86
 
-_Note_: Running the Red toolchain binary from a $PATH currently requires a wrapping shell script (see relevant tickets: [#543](https://github.com/red/red/issues/543) and [#1547](https://github.com/red/red/issues/1547).
+_Note_: Running the Red toolchain binary from a $PATH currently requires a wrapping shell script (see relevant tickets: [#543](https://github.com/red/red/issues/543) and [#1547](https://github.com/red/red/issues/1547)).
 
 Running the Red REPL
 -----------------------
 
 1. Just run the `red` binary with no option to access the [REPL](http://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop).
 
-        -=== Red Console alpha version ===-
-        (only ASCII input supported)
+        ---== Red 0.6.3 ==-- 
+        Type HELP for starting information. 
 
-        red>>
+        >>
 
 1. You can use it to test rapidly some Red code:
 
-        red>> 1 + 2
+        >> 1 + 2
         == 3
 
-        red>> inc: func [n][n + 1]
+        >> inc: func [n][n + 1]
         == func [n][n + 1]
 
-        red>> inc 123
+        >> inc 123
         == 124
 
   
@@ -164,7 +165,7 @@ The compiler and linker are currently written in Rebol. Please follow the instru
 
 1. Clone this git repository or download an archive (`ZIP` button above or from [tagged packages](https://github.com/red/red/tags)).
 
-1. Download a Rebol interpreter suitable for your OS: [Windows](http://www.rebol.com/downloads/v278/rebol-core-278-3-1.exe), [Linux](http://www.maxvessi.net/rebsite/Linux/) (or [Linux](http://www.rebol.com/downloads/v278/rebol-core-278-4-2.tar.gz)), [Mac OS X](http://www.rebol.com/downloads/v278/rebol-core-278-2-5.tar.gz), [FreeBSD](http://www.rebol.com/downloads/v278/rebol-core-278-7-2.tar.gz), [OpenBSD](http://www.rebol.com/downloads/v278/rebol-core-278-9-4.tar.gz), [Solaris](http://www.rebol.com/downloads/v276/rebol-core-276-10-1.gz)
+1. Download a Rebol interpreter suitable for your OS: [Windows](http://www.rebol.com/downloads/v278/rebol-core-278-3-1.exe), [Linux](http://www.maxvessi.net/rebsite/Linux/) (or [Linux](http://www.rebol.com/downloads/v278/rebol-core-278-4-2.tar.gz)), [Mac OS X](http://www.rebol.com/downloads/v278/rebol-core-278-2-5.tar.gz), [FreeBSD](http://www.rebol.com/downloads/v278/rebol-core-278-7-2.tar.gz), [OpenBSD](http://www.rebol.com/downloads/v278/rebol-core-278-9-4.tar.gz), [Solaris](http://www.rebol.com/downloads/v276/rebol-core-276-10-1.gz).
 
 1. Extract the `rebol` binary, put it in root folder, that's all!
 
@@ -184,7 +185,11 @@ You can also compile the Red console from source:
 
         >> do/args %red.r "-r %environment/console/console.red"
 
-Note: the `-c` argument is not necessary when launching the Red toolchain from sources, as the default action is to compile the input script (the binary form default action is run the input script through the interpretor).
+To compile the Windows GUI console from source:
+
+        >> do/args %red.r "-r -t Windows %environment/console/gui-console.red"
+
+Note: the `-c` argument is not necessary when launching the Red toolchain from sources, as the default action is to compile the input script (the toolchain in binary form default action is to run the input script through the interpreter).
 The `-r` argument is needed when compiling the Red console to make additional runtime functions available.
 
 Contributing

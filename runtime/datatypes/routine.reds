@@ -115,14 +115,13 @@ routine: context [
 		return: [integer!]
 		/local
 			s	 [series!]
-			blk	 [red-block!]
+			blk	 [red-block! value]
 			body [red-value!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "routine/mold"]]
 
 		string/concatenate-literal buffer "routine "
 		
-		blk: as red-block! stack/push*
 		blk/header: TYPE_ROUTINE
 		blk/head: 0
 		blk/node: fun/spec
@@ -155,6 +154,7 @@ routine: context [
 		switch op [
 			COMP_EQUAL
 			COMP_SAME
+			COMP_FIND
 			COMP_STRICT_EQUAL
 			COMP_NOT_EQUAL
 			COMP_SORT

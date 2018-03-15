@@ -28,6 +28,8 @@ Red/System [
 #define as-float	  [as float!]
 #define as-float32	  [as float32!]
 #define as-c-string	  [as c-string!]
+#define keep-float	  [as float! keep]
+#define keep-float32  [as float32! keep]
  
 #define null-byte	  #"^(00)"
 #define yes			  true
@@ -37,6 +39,7 @@ Red/System [
 
 #define byte-ptr!	  [pointer! [byte!]]
 #define int-ptr!	  [pointer! [integer!]]
+#define float-ptr!    [pointer! [float!]]
 #define float32-ptr!  [pointer! [float32!]]
 
 #define make-c-string [as c-string! allocate]
@@ -137,10 +140,7 @@ re-throw: func [/local id [integer!]][
 			system/fpu/update
 		]
 		ARM [
-			system/fpu/option/rounding:  FPU_VFP_ROUNDING_NEAREST
-			system/fpu/mask/overflow:	 yes
-			system/fpu/mask/zero-divide: yes
-			system/fpu/mask/invalid-op:  yes
+			system/fpu/control-word: 9F00h	;-- mask all exceptions, round to nearest
 			system/fpu/update
 		]
 	]

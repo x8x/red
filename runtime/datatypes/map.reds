@@ -25,6 +25,26 @@ map: context [
 		size/value
 	]
 
+	preprocess-key: func [
+		key		[red-value!]
+	][
+		switch TYPE_OF(key) [
+			TYPE_WORD
+			TYPE_GET_WORD
+			TYPE_SET_WORD
+			TYPE_LIT_WORD [key/header: TYPE_SET_WORD]		;-- convert any-word! to set-word!
+			TYPE_BINARY
+			TYPE_STRING
+			TYPE_FILE
+			TYPE_URL
+			TYPE_TAG
+			TYPE_EMAIL	 [_series/copy as red-series! key as red-series! key null yes null]
+			TYPE_INTEGER TYPE_CHAR TYPE_FLOAT TYPE_DATE
+			TYPE_PERCENT TYPE_TUPLE TYPE_PAIR TYPE_TIME [0]
+			default		[fire [TO_ERROR(script invalid-type) datatype/push TYPE_OF(key)]]
+		]
+	]
+
 	serialize: func [
 		map		[red-hash!]
 		buffer	[red-string!]
@@ -106,6 +126,7 @@ map: context [
 			key		[red-value!]
 			val		[red-value!]
 			psize	[int-ptr!]
+			kkey	[red-value! value]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "map/extend"]]
 
@@ -114,7 +135,7 @@ map: context [
 
 		s: GET_BUFFER(map)
 		size: as-integer s/tail + size - s/offset
-		if size > s/size [s: expand-series s size]
+		if size > s/size [expand-series s size]
 
 		s: GET_BUFFER(src)
 		cell: s/offset + src/head
@@ -134,8 +155,10 @@ map: context [
 				]
 			][
 				either key = null [
+					copy-cell cell kkey
+					preprocess-key kkey
 					s: as series! map/node/value
-					key: copy-cell cell as cell! alloc-tail-unit s (size? cell!) << 1
+					key: copy-cell kkey as cell! alloc-tail-unit s (size? cell!) << 1
 					_hashtable/put table key
 				][
 					val: key + 1
@@ -362,7 +385,7 @@ map: context [
 		if op = COMP_SAME [return either same? [0][-1]]
 		if all [
 			same?
-			any [op = COMP_EQUAL op = COMP_STRICT_EQUAL op = COMP_NOT_EQUAL]
+			any [op = COMP_EQUAL op = COMP_FIND op = COMP_STRICT_EQUAL op = COMP_NOT_EQUAL]
 		][return 0]
 
 		size1: rs-length? blk1
@@ -370,7 +393,7 @@ map: context [
 
 		if size1 <> size2 [										;-- shortcut exit for different sizes
 			return either any [
-				op = COMP_EQUAL op = COMP_STRICT_EQUAL op = COMP_NOT_EQUAL
+				op = COMP_EQUAL op = COMP_FIND op = COMP_STRICT_EQUAL op = COMP_NOT_EQUAL
 			][1][SIGN_COMPARE_RESULT(size1 size2)]
 		]
 
@@ -447,6 +470,7 @@ map: context [
 		if type <> TYPE_MAP [RETURN_COMPARE_OTHER]
 		switch op [
 			COMP_EQUAL
+			COMP_FIND
 			COMP_SAME
 			COMP_STRICT_EQUAL
 			COMP_NOT_EQUAL [
@@ -476,6 +500,7 @@ map: context [
 			val		[red-value!]
 			s		[series!]
 			size	[int-ptr!]
+			k		[red-value! value]
 	][
 		table: parent/table
 		key: _hashtable/get table element 0 0 case? no no
@@ -492,8 +517,10 @@ map: context [
 				value
 			][
 				either key = null [
+					copy-cell element k
+					preprocess-key k
 					s: as series! parent/node/value
-					key: copy-cell element as cell! alloc-tail-unit s (size? cell!) << 1
+					key: copy-cell k as cell! alloc-tail-unit s (size? cell!) << 1
 					_hashtable/put table key
 				][
 					val: key + 1

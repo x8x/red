@@ -45,6 +45,56 @@ issue: context [
 	]
 	
 	;-- Actions --
+	
+	to: func [
+		proto	[red-value!]
+		spec	[red-value!]
+		type	[integer!]
+		return: [red-value!]
+		/local
+			char	[red-char!]
+			str		[red-string!]
+			w		[red-word!]
+			sym 	[integer!]
+	][
+		#if debug? = yes [if verbose > 0 [print-line "issue/to"]]
+
+		switch TYPE_OF(spec) [
+			TYPE_WORD
+			TYPE_SET_WORD
+			TYPE_GET_WORD
+			TYPE_LIT_WORD
+			TYPE_REFINEMENT
+			TYPE_ISSUE [
+				proto: spec
+			]
+			TYPE_CHAR
+			TYPE_STRING	[
+				either TYPE_OF(spec) = TYPE_CHAR [
+					char: as red-char! spec
+					str: string/make-at stack/push* 1 Latin1
+					string/append-char GET_BUFFER(str) char/value
+				][
+					str: as red-string! spec
+					if str/head > 0 [
+						str: as red-string! _series/copy
+							as red-series! spec
+							as red-series! proto
+							null no null
+					]
+				]
+				sym: symbol/make-alt str					;-- convert before altering proto slot
+
+				w: as red-word! proto
+				w/ctx: global-ctx
+				w/symbol: sym
+				w/index: -1
+			]
+			default [word/to proto spec type]
+		]
+		proto/header: type
+		proto
+	]
 
 	mold: func [
 		w	    [red-word!]
@@ -84,7 +134,7 @@ issue: context [
 			INHERIT_ACTION	;make
 			null			;random
 			null			;reflect
-			INHERIT_ACTION	;to
+			:to
 			INHERIT_ACTION	;form
 			:mold
 			null			;eval-path

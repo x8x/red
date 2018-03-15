@@ -48,13 +48,22 @@ reset-cursor-rects: func [
 	cmd		[integer!]
 	/local
 		cur [integer!]
+		sz	[CGPoint! value]
 		rc	[NSRect! value]
 ][
 	cur: objc_getAssociatedObject self RedCursorKey
 	if cur <> 0 [
-		rc: objc_msgSend_rect [self sel_getUid "bounds"]
+		either zero? objc_msgSend [
+			self sel_getUid "respondsToSelector:" sel_getUid "contentSize"
+		][
+			rc: objc_msgSend_rect [self sel_getUid "bounds"]
+			sz/x: rc/w
+			sz/y: rc/h
+		][
+			sz: objc_msgSend_pt [self sel_getUid "contentSize"]
+		]
 		objc_msgSend [
-			self sel_getUid "addCursorRect:cursor:" rc/x rc/y rc/w rc/h cur
+			self sel_getUid "addCursorRect:cursor:" 0 0 sz/x sz/y cur
 		]
 	]
 ]
@@ -155,6 +164,31 @@ button-mouse-down: func [
 	]
 ]
 
+mouse-events-base: func [
+	[cdecl]
+	self	[integer!]
+	cmd		[integer!]
+	event	[integer!]
+	/local
+		p		[int-ptr!]
+		flags	[integer!]
+		super	[objc_super! value]
+		cls		[integer!]
+][
+	p: as int-ptr! event
+	flags: check-extra-keys event
+	objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
+	switch p/2 [
+		NSRightMouseDown [make-event self flags EVT_RIGHT_DOWN]
+		NSRightMouseUp	 [make-event self flags EVT_RIGHT_UP]
+		default			 [0]
+	]
+	cls: objc_msgSend [self sel_getUid "superclass"]
+	super/receiver: self
+	super/superclass: cls
+	objc_msgSendSuper [super cmd event]
+]
+
 mouse-events: func [
 	[cdecl]
 	self	[integer!]
@@ -166,11 +200,13 @@ mouse-events: func [
 		evt		[integer!]
 		flags	[integer!]
 		state	[integer!]
+		drag?	[logic!]
 ][
 	p: as int-ptr! event
 	flags: check-extra-keys event
 	objc_setAssociatedObject self RedNSEventKey event OBJC_ASSOCIATION_ASSIGN
-	state: switch p/2 [
+	drag?: no
+	switch p/2 [
 		NSLeftMouseDown		[
 			evt: objc_msgSend [event sel_getUid "clickCount"]
 			evt: switch evt [
@@ -178,42 +214,43 @@ mouse-events: func [
 				2 [EVT_DBL_CLICK]
 				default [-1]
 			]
-			either evt = -1 [EVT_DISPATCH][make-event self flags evt]
+			state: either evt = -1 [EVT_DISPATCH][make-event self flags evt]
 		]
 		NSLeftMouseUp		[
-			either 2 > objc_msgSend [event sel_getUid "clickCount"][
+			state: either 2 > objc_msgSend [event sel_getUid "clickCount"][
 				make-event self flags EVT_LEFT_UP
 			][
 				EVT_DISPATCH
 			]
 		]
-		NSRightMouseDown	[make-event self flags EVT_RIGHT_DOWN]
-		NSRightMouseUp		[make-event self flags EVT_RIGHT_UP]
+		NSRightMouseDown	[state: make-event self flags EVT_RIGHT_DOWN]
+		NSRightMouseUp		[state: make-event self flags EVT_RIGHT_UP]
 		NSOtherMouseDown	[
 			evt: either 2 < objc_msgSend [event sel_getUid "buttonNumber"][EVT_AUX_DOWN][EVT_MIDDLE_DOWN]
-			make-event self flags evt
+			state: make-event self flags evt
 		]
 		NSOtherMouseUp		[
 			evt: either 2 < objc_msgSend [event sel_getUid "buttonNumber"][EVT_AUX_UP][EVT_MIDDLE_UP]
-			make-event self flags evt
+			state: make-event self flags evt
 		]
-		NSLeftMouseDragged	
-		NSRightMouseDragged	
-		NSOtherMouseDragged	[
-			opt: (get-face-values self) + FACE_OBJ_OPTIONS
-			either all [
-				zero? objc_getAssociatedObject self RedEnableKey
-				any [
-					TYPE_OF(opt) = TYPE_BLOCK
-					0 <> objc_getAssociatedObject self RedAllOverFlagKey
-				]
-			][
-				make-event self flags EVT_OVER
-			][
-				EVT_DISPATCH
+		NSLeftMouseDragged	[drag?: yes flags: flags or EVT_FLAG_DOWN]
+		NSRightMouseDragged [drag?: yes flags: flags or EVT_FLAG_ALT_DOWN]
+		NSOtherMouseDragged	[drag?: yes flags: flags or EVT_FLAG_MID_DOWN]
+		default [state: EVT_DISPATCH]
+	]
+	if drag? [
+		opt: (get-face-values self) + FACE_OBJ_OPTIONS
+		state: either all [
+			zero? objc_getAssociatedObject self RedEnableKey
+			any [
+				TYPE_OF(opt) = TYPE_BLOCK
+				0 <> objc_getAssociatedObject self RedAllOverFlagKey
 			]
+		][
+			make-event self flags EVT_OVER
+		][
+			EVT_DISPATCH
 		]
-		default [EVT_DISPATCH]
 	]
 	if state = EVT_DISPATCH [msg-send-super self cmd event]
 ]
@@ -240,6 +277,29 @@ red-timer-action: func [
 	make-event self 0 EVT_TIME
 ]
 
+popup-button-action: func [
+	[cdecl]
+	self	[integer!]
+	cmd		[integer!]
+	sender	[integer!]
+	/local
+		idx [integer!]
+		res [integer!]
+		str [integer!]
+][
+	idx: objc_msgSend [self sel_getUid "indexOfSelectedItem"]		;-- 1-based index
+	str: objc_msgSend [self sel_getUid "titleOfSelectedItem"]
+	if idx > 0 [
+		res: make-event self idx EVT_SELECT
+		set-selected self idx
+		set-text self str
+		if res = EVT_DISPATCH [
+			make-event self idx EVT_CHANGE
+		]
+	]
+	objc_msgSend [self sel_getUid "setTitle:" str]
+]
+
 on-key-down: func [
 	[cdecl]
 	self	[integer!]
@@ -251,15 +311,15 @@ on-key-down: func [
 ][
 	key: objc_msgSend [event sel_getUid "keyCode"]
 	key: either key >= 80h [0][translate-key key]
-	flags: either char-key? as-byte key [0][80000000h]	;-- special key or not
-	flags: flags or check-extra-keys event
+	special-key: either char-key? as-byte key [0][-1]	;-- special key or not
+	flags: check-extra-keys event
 
 	res: make-event self key or flags EVT_KEY_DOWN
 	if res <> EVT_NO_DISPATCH [
-		either flags and 80000000h <> 0 [				;-- special key
+		either special-key = -1 [						;-- special key
 			make-event self key or flags EVT_KEY
 		][
-			if key = 8 [								;-- backspace
+			if any [key = 8 key = 9][								;-- backspace
 				make-event self key or flags EVT_KEY
 				exit
 			]
@@ -324,10 +384,33 @@ on-key-up: func [
 ][
 	key: objc_msgSend [event sel_getUid "keyCode"]
 	key: either key >= 80h [0][translate-key key]
-	flags: either char-key? as-byte key [0][80000000h]	;-- special key or not
-	flags: flags or check-extra-keys event
-	make-event self key or flags EVT_KEY_UP
-	;msg-send-super self cmd event
+	special-key: either char-key? as-byte key [0][-1]	;-- special key or not
+	flags: check-extra-keys event
+	if all [
+		EVT_DISPATCH = make-event self key or flags EVT_KEY_UP
+		cmd <> 0
+	][
+		msg-send-super self cmd event
+	]
+]
+
+on-flags-changed: func [
+	[cdecl]
+	self	[integer!]
+	cmd		[integer!]
+	event	[integer!]
+	/local
+		key		[integer!]
+		flags	[integer!]
+		evt		[integer!]
+][
+	special-key: -1
+	key: translate-key objc_msgSend [event sel_getUid "keyCode"]
+	flags: check-extra-keys event
+	evt: either zero? flags [EVT_KEY_UP][EVT_KEY_DOWN]
+	if EVT_DISPATCH = make-event self key or flags evt [
+		msg-send-super self cmd event
+	]
 ]
 
 button-click: func [
@@ -453,11 +536,14 @@ slider-change: func [
 	cmd		[integer!]
 	sender	[integer!]
 	/local
+		values	[red-value!]
 		pos		[red-float!]
+		opt		[red-value!]
 		val		[float!]
 		divisor [float!]
 ][
-	pos: (as red-float! get-face-values self) + FACE_OBJ_DATA
+	values: get-face-values self
+	pos: (as red-float! values) + FACE_OBJ_DATA
 
 	if all [
 		TYPE_OF(pos) <> TYPE_FLOAT
@@ -468,6 +554,15 @@ slider-change: func [
 	val: objc_msgSend_fpret [self sel_getUid "floatValue"]
 	divisor: objc_msgSend_fpret [self sel_getUid "maxValue"]
 	pos/value: val / divisor
+
+	opt: values + FACE_OBJ_OPTIONS
+	if all [
+		zero? objc_getAssociatedObject self RedEnableKey
+		any [
+			TYPE_OF(opt) = TYPE_BLOCK
+			0 <> objc_getAssociatedObject self RedAllOverFlagKey
+		]
+	][make-event self EVT_FLAG_DOWN EVT_OVER]
 	make-event self 0 EVT_CHANGE
 ]
 
@@ -530,7 +625,7 @@ text-did-change: func [
 	notif	[integer!]
 ][
 	set-text self objc_msgSend [self sel_getUid "stringValue"]
-	make-event self 0 EVT_CHANGE
+	if loop-started? [make-event self 0 EVT_CHANGE]
 	msg-send-super self cmd notif
 ]
 
@@ -550,7 +645,7 @@ area-text-change: func [
 	notif	[integer!]
 ][
 	set-text self objc_msgSend [self sel_getUid "string"]
-	make-event self 0 EVT_CHANGE
+	if loop-started? [make-event self 0 EVT_CHANGE]
 ]
 
 selection-change: func [
@@ -563,7 +658,7 @@ selection-change: func [
 		res [integer!]
 ][
 	idx: objc_msgSend [self sel_getUid "indexOfSelectedItem"]
-	if idx >= 0 [
+	if all [loop-started? idx >= 0][
 		res: make-event self idx + 1 EVT_SELECT
 		set-selected self idx + 1
 		set-text self objc_msgSend [self sel_getUid "itemObjectValueAtIndex:" idx]
@@ -617,8 +712,13 @@ object-for-table: func [
 		data [red-block!]
 		head [red-value!]
 		tail [red-value!]
+		font [red-object!]
+		face [red-object!]
+		attr [integer!]
+		ivar [integer!]
 		idx  [integer!]
 		type [integer!]
+		str  [integer!]
 ][
 	data: (as red-block! get-face-values obj) + FACE_OBJ_DATA
 	head: block/rs-head data
@@ -630,7 +730,18 @@ object-for-table: func [
 		head: head + 1
 		idx: idx + 1
 	]
-	to-NSString as red-string! block/rs-abs-at data idx
+	font: (as red-object! get-face-values obj) + FACE_OBJ_FONT
+	str: to-NSString as red-string! block/rs-abs-at data idx
+	if TYPE_OF(font) = TYPE_OBJECT [
+		ivar: class_getInstanceVariable object_getClass self IVAR_RED_FACE
+		face: as red-object! self + ivar_getOffset ivar
+		attr: make-font-attrs font face text-list
+		str: objc_msgSend [
+			objc_msgSend [objc_getClass "NSAttributedString" sel_getUid "alloc"]
+			sel_getUid "initWithString:attributes:" str attr
+		]
+	]
+	str
 ]
 
 table-cell-edit: func [
@@ -669,6 +780,149 @@ will-finish: func [
 	0
 ]
 
+win-send-event: func [
+	self	[integer!]
+	type	[integer!]
+	event	[integer!]
+	return: [logic!]
+	/local
+		responder	[integer!]
+		find?		[logic!]
+		send?		[logic!]
+][
+	send?: yes
+	case [
+		type = NSKeyUp [
+			responder: objc_msgSend [self sel_getUid "firstResponder"]
+			object_getInstanceVariable responder IVAR_RED_DATA :type
+			if type = base [
+				on-key-up responder 0 event
+				send?: no
+			]
+		]
+		type = NSKeyDown [
+			find?: yes
+			responder: objc_msgSend [self sel_getUid "firstResponder"]
+			object_getInstanceVariable responder IVAR_RED_DATA :type
+			if type <> base [
+				unless red-face? responder [
+					responder: objc_getAssociatedObject self RedFieldEditorKey
+					unless red-face? responder [find?: no]
+				]
+				if find? [on-key-down responder event]
+			]
+		]
+		true [0]
+	]
+	send?
+]
+
+app-send-event: func [
+	[cdecl]
+	self		[integer!]
+	cmd			[integer!]
+	event		[integer!]
+	/local
+		p-int	[int-ptr!]
+		type	[integer!]
+		window	[integer!]
+		n-win	[integer!]
+		flags	[integer!]
+		faces	[red-block!]
+		face	[red-object!]
+		start	[red-object!]
+		check?	[logic!]
+		active?	[logic!]
+		down?	[logic!]
+		y		[integer!]
+		x		[integer!]
+		point	[CGPoint!]
+		view	[integer!]
+		state	[integer!]
+][
+	window: objc_msgSend [event sel_getUid "window"]
+	p-int: as int-ptr! event
+
+	type: p-int/2
+	switch type [
+		NSMouseMoved
+		NSLeftMouseDragged
+		NSRightMouseDragged
+		NSOtherMouseDragged [
+			check?: yes
+			window: process-mouse-tracking window event
+		]
+		NSApplicationDefined [
+			x: objc_msgSend [event sel_getUid "data1"]
+			if x = QuitMsgData [
+				objc_msgSend [NSApp sel_getUid "stop:" NSApp]
+				exit
+			]
+		]
+		default [0]
+	]
+
+	state: EVT_DISPATCH
+	if window <> 0 [
+		down?: no active?: no check?: no
+
+		if any [
+			type = NSLeftMouseDown type = NSRightMouseDown type = NSOtherMouseDown
+		][
+			active?: yes down?: yes check?: yes
+		]
+		if any [
+			type = NSLeftMouseUp type = NSRightMouseUp type = NSOtherMouseUp
+		][
+			active?: yes check?: yes
+		]
+		switch type [
+			NSMouseEntered
+			NSMouseExited
+			NSKeyDown
+			NSKeyUp
+			NSScrollWheel [check?: yes]
+			default [0]
+		]
+
+		if all [check? red-face? window][
+			faces: as red-block! #get system/view/screens
+			face: as red-object! block/rs-head faces		;-- screen 1 TBD multi-screen support
+			faces: as red-block! get-node-facet face/ctx FACE_OBJ_PANE
+			if 1 >= block/rs-length? faces [state: EVT_DISPATCH]
+
+			start: as red-object! block/rs-head faces
+			face:  as red-object! block/rs-tail faces
+			while [
+				face: face - 1
+				face >= start
+			][
+				flags: get-flags as red-block! get-node-facet face/ctx FACE_OBJ_FLAGS
+				if all [
+					window <> get-face-handle face
+					flags and FACET_FLAGS_MODAL <> 0
+				][
+					if down? [NSBeep]
+					state: EVT_NO_DISPATCH
+				]
+			]
+		]
+	]
+	if all [
+		state >= EVT_DISPATCH
+		any [zero? window win-send-event window type event]
+	][
+		msg-send-super self cmd event
+	]
+	if close-window? [
+		close-pending-windows
+		if zero? win-cnt [
+			loop-started?: no
+			post-quit-msg
+		]
+	]
+]
+
 destroy-app: func [
 	[cdecl]
 	self	[integer!]
@@ -676,7 +930,7 @@ destroy-app: func [
 	app		[integer!]
 	return: [logic!]
 ][
-	yes
+	no
 ]
 
 should-terminate: func [
@@ -686,7 +940,7 @@ should-terminate: func [
 	app		[integer!]
 	return: [integer!]
 ][
-	0			;-- NSTerminateCancel, so we don't exit the console
+	#either sub-system = 'gui [1][0]	;-- 0: NSTerminateCancel, so we don't exit the console
 ]
 
 win-should-close: func [
@@ -716,12 +970,11 @@ win-will-close: func [
 ;	sender	[integer!]
 ;	w		[integer!]
 ;	h		[integer!]
+;	return: [NSSize! value]
 ;	/local
-;		sz	[NSSize!]
+;		sz	[NSSize! value]
 ;][
-;	sz: as NSSize! :w
-;	system/cpu/edx: h									;-- return NSSize!
-;	system/cpu/eax: w
+	
 ;]
 
 win-did-resize: func [
@@ -730,31 +983,16 @@ win-did-resize: func [
 	cmd		[integer!]
 	notif	[integer!]
 	/local
-		ws		[NSRect!]
-		sz		[red-pair!]
-		h		[integer!]
-		w		[integer!]
-		y		[integer!]
-		x		[integer!]
-		rc		[NSRect!]
-		saved	[int-ptr!]
-		method	[integer!]
+		sz	[red-pair!]
+		v	[integer!]
+		rc	[NSRect! value]
 ][
-	x: 0
-	rc: as NSRect! :x
-	make-event self 0 EVT_SIZING
-
-	ws: as NSRect! (as int-ptr! self) + 2
-	method: sel_getUid "contentRectForFrameRect:"
-	saved: system/stack/align
-	push 0
-	push ws/h push ws/w push ws/y push ws/x
-	push method push self push rc
-	objc_msgSend_stret 7
-	system/stack/top: saved
+	v: objc_msgSend [self sel_getUid "contentView"]
+	rc: objc_msgSend_rect [v sel_getUid "frame"]
 	sz: (as red-pair! get-face-values self) + FACE_OBJ_SIZE		;-- update face/size
 	sz/x: as-integer rc/w
 	sz/y: as-integer rc/h
+	make-event self 0 EVT_SIZING
 ]
 
 win-live-resize: func [
@@ -1045,6 +1283,7 @@ insert-text-range: func [
 		cstr		[c-string!]
 		key			[integer!]
 ][
+	special-key: 0
 	objc_msgSend [self sel_getUid "unmarkText"]
 	attr-str?: as logic! objc_msgSend [
 		str sel_getUid "isKindOfClass:" objc_getClass "NSAttributedString"
@@ -1126,6 +1365,50 @@ do-cmd-selector: func [
 	][
 		on-key-down self event
 	]
+]
+
+hit-test: func [
+	[cdecl]
+	self	[integer!]
+	cmd		[integer!]
+	x		[integer!]
+	y		[integer!]
+	return: [integer!]
+	/local
+		img		[red-image!]
+		sz		[red-pair!]
+		pt		[CGPoint! value]
+		super	[objc_super! value]
+		v		[integer!]
+		pixel	[integer!]
+		w		[integer!]
+		h		[integer!]
+		ratio	[float32!]
+		vals	[red-value!]
+][
+	super/receiver: self
+	super/superclass: objc_msgSend [self sel_getUid "superclass"]
+	v: objc_msgSendSuper [super cmd x y]
+	if v = self [
+		vals: get-face-values self
+		img: (as red-image! vals) + FACE_OBJ_IMAGE
+		sz: (as red-pair! vals) + FACE_OBJ_SIZE
+		if TYPE_OF(img) = TYPE_IMAGE [
+			pt: objc_msgSend_pt [
+				self sel_getUid "convertPoint:fromView:" x y
+				objc_msgSend [self sel_getUid "superview"]
+			]
+			w: IMAGE_WIDTH(img/size)
+			h: IMAGE_HEIGHT(img/size)
+			ratio: (as float32! w) / (as float32! sz/x)
+			x: as-integer pt/x * ratio
+			ratio: (as float32! h) / (as float32! sz/y)
+			y: as-integer pt/y * ratio
+			pixel: OS-image/get-pixel img/node y * w + x
+			if pixel >>> 24 = 0 [v: 0]
+		]
+	]
+	v
 ]
 
 draw-rect: func [
@@ -1239,37 +1522,4 @@ perform-key-equivalent: func [
 		]
 	]
 	as logic! msg-send-super self cmd event
-]
-
-win-send-event: func [
-	[cdecl]
-	self	[integer!]
-	cmd		[integer!]
-	event	[integer!]
-	/local
-		p-int		[int-ptr!]
-		type		[integer!]
-		view		[integer!]
-		responder	[integer!]
-		find?		[logic!]
-][
-	p-int: as int-ptr! event
-	type: p-int/2
-	;view: objc_msgSend [self sel_getUid "contentView"]
-	;p-int: as int-ptr! self
-	;view: p-int/7
-
-	if type = NSKeyDown	[
-		find?: yes
-		responder: objc_msgSend [self sel_getUid "firstResponder"]
-		object_getInstanceVariable responder IVAR_RED_DATA :type
-		if type <> base [
-			unless red-face? responder [
-				responder: objc_getAssociatedObject self RedFieldEditorKey
-				unless red-face? responder [find?: no]
-			]
-			if find? [on-key-down responder event]
-		]
-	]
-	msg-send-super self cmd event
 ]

@@ -29,19 +29,19 @@ system/lexer: context [
 	]
 	
 	make-hm: routine [h [integer!] m [integer!]][
-		time/box (as-float h) * 3600.0 + ((as-float m) * 60.0) / time/nano
+		time/box (as-float h) * 3600.0 + ((as-float m) * 60.0)
 	]
 	
 	make-msf: routine [m [integer!] s [float!]][
-		time/box ((as-float m) * 60.0) + s / time/nano
+		time/box ((as-float m) * 60.0) + s
 	]
 	
 	make-hms: routine [h [integer!] m [integer!] s [integer!]][
-		time/box (as-float h) * 3600.0 + ((as-float m) * 60.0) + (as-float s) / time/nano
+		time/box (as-float h) * 3600.0 + ((as-float m) * 60.0) + (as-float s)
 	]
 	
 	make-hmsf: routine [h [integer!] m [integer!] s [float!]][
-		time/box (as-float h) * 3600.0 + ((as-float m) * 60.0) + s / time/nano
+		time/box (as-float h) * 3600.0 + ((as-float m) * 60.0) + s
 	]
 	
 	make-time: function [
@@ -97,52 +97,30 @@ system/lexer: context [
 			2  [binary/decode-2  p len unit]
 			64 [binary/decode-64 p len unit]
 		]
-		if ret/node = null [ret/header: TYPE_NONE]			;-- return NONE!
+		if ret/node = null [ret/header: TYPE_NONE]		;-- return NONE!
 	]
 
 	make-tuple: routine [
 		start  [string!]
 		end	   [string!]
 		/local
-			str  [series!]
-			c	 [integer!]
-			n	 [integer!]
-			m	 [integer!]
+			s    [series!]
+			err	 [integer!]
 			len  [integer!]
 			unit [integer!]
-			size [integer!]
 			p	 [byte-ptr!]
 			tp	 [byte-ptr!]
 			ret  [red-value!]
 	][
-		str:  GET_BUFFER(start)
-		unit: GET_UNIT(str)
+		s:	  GET_BUFFER(start)
+		unit: GET_UNIT(s)
 		p:	  string/rs-head start
 		len:  end/head - start/head
-		ret: stack/arguments
-		tp: (as byte-ptr! ret) + 4
-
-		n: 0
-		size: 0
-		until [
-			c: string/get-char p unit
-			either c = as-integer #"." [
-				size: size + 1
-				tp/size: as byte! n
-				n: 0
-			][
-				m: n * 10
-				n: m
-				m: n + c - #"0"
-				n: m
-			]
-			p: p + unit
-			len: len - 1
-			zero? len
-		]
-		size: size + 1									;-- last number
-		tp/size: as byte! n
-		ret/header: TYPE_TUPLE or (size << 19)
+		ret:  stack/arguments
+		err:  0
+		
+		tokenizer/scan-tuple p len unit	:err ret
+		assert err = 0									;-- pre-checked validity
 		ret
 	]
 
@@ -151,66 +129,31 @@ system/lexer: context [
 		end	   [string!]
 		type   [datatype!]
 		/local
-			str  [series!]
-			c	 [integer!]
-			n	 [integer!]
-			m	 [integer!]
+			s	 [series!]
 			len  [integer!]
 			unit [integer!]
 			p	 [byte-ptr!]
-			neg? [logic!]
+			err	 [integer!]
+			i	 [integer!]
 	][
 		if type/value <> TYPE_INTEGER [
 			make-float start end type					;-- float! escape path
 			exit
 		]
-		str:  GET_BUFFER(start)
-		unit: GET_UNIT(str)
+		s:	  GET_BUFFER(start)
+		unit: GET_UNIT(s)
 		p:	  string/rs-head start
 		len:  end/head - start/head
-		neg?: no
+		err:  0
 
-		c: string/get-char p unit
-		if any [
-			c = as-integer #"+" 
-			c = as-integer #"-"
-		][
-			neg?: c = as-integer #"-"
-			p: p + unit
-			len: len - 1
-		]
-		n: 0
-		until [
-			c: (string/get-char p unit) - #"0"
-			if c >= 0 [									;-- skip #"'"
-				m: n * 10
-				
-				if system/cpu/overflow? [
-					type/value: TYPE_FLOAT
-					make-float start end type			;-- fallback to float! loading
-					exit
-				]
-				n: m
-
-				if all [neg? n = 2147483640 c = 8][
-					integer/box 80000000h				;-- special exit trap for -2147483648
-					exit
-				]
-
-				m: n + c
-				
-				if system/cpu/overflow? [
-					type/value: TYPE_FLOAT
-					make-float start end type			;-- fallback to float! loading
-					exit
-				]
-				n: m
-			]
-			p: p + unit
-			len: len - 1
-			zero? len
-		]
-		integer/box either neg? [0 - n][n]
+		i: tokenizer/scan-integer p len unit :err
+		
+		if err <> 0 [
+			type/value: TYPE_FLOAT
+			make-float start end type			;-- fallback to float! loading
+			exit
+		]			
+		integer/box i
 	]
 
 	make-float: routine [
@@ -218,40 +161,21 @@ system/lexer: context [
 		end	  [string!]
 		type  [datatype!]
 		/local
-			str  [series!]
-			cp	 [integer!]
+			s	 [series!]
 			unit [integer!]
 			len  [integer!]
 			p	 [byte-ptr!]
-			tail [byte-ptr!]
-			cur	 [byte-ptr!]
-			s0	 [byte-ptr!]
+			err	 [integer!]
 			f	 [float!]
 	][
-		cur: as byte-ptr! "0000000000000000000000000000000"		;-- 32 bytes including NUL
-
-		str:  GET_BUFFER(start)
-		unit: GET_UNIT(str)
+		s:	  GET_BUFFER(start)
+		unit: GET_UNIT(s)
 		p:	  string/rs-head start
 		len:  end/head - start/head
-		tail: p + (len << (unit >> 1))
-
-		if len > 31 [cur: allocate len + 1]
-		s0:   cur
-
-		until [											;-- convert to ascii string
-			cp: string/get-char p unit
-			if cp <> as-integer #"'" [					;-- skip #"'"
-				if cp = as-integer #"," [cp: as-integer #"."]
-				cur/1: as-byte cp
-				cur: cur + 1
-			]
-			p: p + unit
-			p = tail
-		]
-		cur/1: #"^@"									;-- replace the byte with null so to-float can use it as end of input
-		f: string/to-float s0
-		if len > 31 [free s0]
+		err:  0
+		
+		f: tokenizer/scan-float p len unit :err
+		
 		either type/value = TYPE_FLOAT [float/box f][percent/box f / 100.0]
 	]
 
@@ -408,9 +332,9 @@ system/lexer: context [
 			not-file-char not-str-char not-mstr-char caret-char
 			non-printable-char integer-end ws-ASCII ws-U+2k control-char
 			four half non-zero path-end base base64-char slash-end not-url-char
-			email-end pair-end file-end
+			email-end pair-end file-end err
 	][
-		cs:		[- - - - - - - - - - - - - - - - - - - - - - - - - -]	;-- memoized bitsets
+		cs:		[- - - - - - - - - - - - - - - - - - - - - - - - - - - - -] ;-- memoized bitsets
 		stack:	clear []
 		count?:	yes										;-- if TRUE, lines counter is enabled
 		old-line: line: 1
@@ -437,49 +361,69 @@ system/lexer: context [
 			if type = file! [parse new [any [s: #"\" change s #"/" | skip]]]
 			new
 		]
+		
+		month-rule: [(m: none)]							;-- dynamically filled
+		mon-rule:   [(m: none)]							;-- dynamically filled
 
 		if cs/1 = '- [
-			cs/1:  charset "0123465798"					;-- digit
-			cs/2:  charset "ABCDEF"						;-- hexa-upper
-			cs/3:  charset "abcdef"						;-- hexa-lower
-			cs/4:  union cs/1 cs/2						;-- hexa
-			cs/5:  union cs/4 cs/3						;-- hexa-char	
-			cs/6:  charset {/\^^,[](){}"#%$@:;}			;-- not-word-char
-			cs/7:  union union cs/6 cs/1 charset {'}	;-- not-word-1st
-			cs/8:  charset {[](){}"@:;}					;-- not-file-char
-			cs/9:  #"^""								;-- not-str-char
-			cs/10: #"}"									;-- not-mstr-char
-			cs/11: charset [#"^(40)" - #"^(5F)"]		;-- caret-char
-			cs/12: charset [							;-- non-printable-char
-				#"^(00)" - #"^(08)"						;-- (exclude TAB)
-				#"^(0A)" - #"^(1F)"
+			do [
+				cs/1:  charset "0123465798"					;-- digit
+				cs/2:  charset "ABCDEF"						;-- hexa-upper
+				cs/3:  charset "abcdef"						;-- hexa-lower
+				cs/4:  union cs/1 cs/2						;-- hexa
+				cs/5:  union cs/4 cs/3						;-- hexa-char	
+				cs/6:  charset {/\^^,[](){}"#%$@:;}			;-- not-word-char
+				cs/7:  union union cs/6 cs/1 charset {'}	;-- not-word-1st
+				cs/8:  charset {[](){}"@:;}					;-- not-file-char
+				cs/9:  #"^""								;-- not-str-char
+				cs/10: #"}"									;-- not-mstr-char
+				cs/11: charset [#"^(40)" - #"^(5F)"]		;-- caret-char
+				cs/12: charset [							;-- non-printable-char
+					#"^(00)" - #"^(08)"						;-- (exclude TAB)
+					#"^(0A)" - #"^(1F)"
+				]
+				cs/13: charset {^{"[]();:xX}				;-- integer-end
+				cs/14: charset " ^-^M"						;-- ws-ASCII, ASCII common whitespaces
+				cs/15: charset [#"^(2000)" - #"^(200A)"]	;-- ws-U+2k, Unicode spaces in the U+2000-U+200A range
+				cs/16: charset [ 							;-- Control characters
+					#"^(00)" - #"^(1F)"						;-- C0 control codes
+					#"^(80)" - #"^(9F)"						;-- C1 control codes
+				]
+				cs/17: charset "01234"						;-- four
+				cs/18: charset "012345"						;-- half
+				cs/19: charset "123456789"					;-- non-zero
+				cs/20: charset {^{"[]();}					;-- path-end
+				cs/21: union cs/1 charset [					;-- base64-char
+					#"A" - #"Z" #"a" - #"z" #"+" #"/" #"="
+				]
+				cs/22: charset {[](){}":;}					;-- slash-end
+				cs/23: charset {[](){}";}					;-- not-url-char
+				cs/24: union cs/8 union cs/14 charset "<^/" ;-- email-end
+				cs/25: charset {^{"[]();:}					;-- pair-end
+				cs/26: charset {^{[]();:}					;-- file-end
+				cs/27: charset "/-"							;-- date-sep
+				cs/28: charset "/T"							;-- time-sep
+				cs/29: charset "=><[](){};^""				;-- not-tag-1st
+
+				list: system/locale/months
+				while [not tail? list][
+					append month-rule list/1
+					append/only month-rule p: copy quote (m: ?)
+					unless tail? next list [append month-rule '|]
+					p/2: index? list
+					append mon-rule copy/part list/1 3
+					append/only mon-rule p
+					unless tail? next list [append mon-rule '|]
+					list: next list
+				]
 			]
-			cs/13: charset {^{"[]();:xX}				;-- integer-end
-			cs/14: charset " ^-^M"						;-- ws-ASCII, ASCII common whitespaces
-			cs/15: charset [#"^(2000)" - #"^(200A)"]	;-- ws-U+2k, Unicode spaces in the U+2000-U+200A range
-			cs/16: charset [ 							;-- Control characters
-				#"^(00)" - #"^(1F)"						;-- C0 control codes
-				#"^(80)" - #"^(9F)"						;-- C1 control codes
-			]
-			cs/17: charset "01234"						;-- four
-			cs/18: charset "012345"						;-- half
-			cs/19: charset "123456789"					;-- non-zero
-			cs/20: charset {^{"[]();}					;-- path-end
-			cs/21: union cs/1 charset [					;-- base64-char
-				#"A" - #"Z" #"a" - #"z" #"+" #"/" #"="
-			]
-			cs/22: charset {[](){}":;}					;-- slash-end
-			cs/23: charset {[](){}";}					;-- not-url-char
-			cs/24: union cs/8 union cs/14 charset "<^/" ;-- email-end
-			cs/25: charset {^{"[]();:}					;-- pair-end
-			cs/26: charset {^{[]();:}					;-- file-end
 		]
 		set [
 			digit hexa-upper hexa-lower hexa hexa-char not-word-char not-word-1st
 			not-file-char not-str-char not-mstr-char caret-char
 			non-printable-char integer-end ws-ASCII ws-U+2k control-char
 			four half non-zero path-end base64-char slash-end not-url-char email-end
-			pair-end file-end
+			pair-end file-end date-sep time-sep not-tag-1st
 		] cs
 
 		byte: [
@@ -488,7 +432,7 @@ system/lexer: context [
 			| "1" digit digit
 			| opt #"0" non-zero digit
 			| 0 2 #"0" digit
-			| #"0"
+			| 1 2 #"0"
 		]
 
 		;-- Whitespaces list from: http://en.wikipedia.org/wiki/Whitespace_character
@@ -595,7 +539,7 @@ system/lexer: context [
 		string-rule: [(type: string!) line-string | multiline-string]
 		
 		tag-rule: [
-			#"<" not [#"=" | #">" | #"<" | ws] (type: tag!)
+			#"<" not [not-tag-1st | ws] (type: tag!)
 			 s: some [#"^"" thru #"^"" | #"'" thru #"'" | e: #">" break | skip]
 			(if e/1 <> #">" [throw-error [tag! back s]])
 		]
@@ -681,7 +625,7 @@ system/lexer: context [
 				]
 			]
 			opt [#":" (type: set-path! set-path back tail stack)][
-				ahead [path-end | ws | end] | (throw-error [type path])
+				ahead [path-end | ws-no-count | end] | (throw-error [type path])
 			]
 			(pop stack)
 		]
@@ -765,6 +709,81 @@ system/lexer: context [
 					| (value: make-time pos value value2 none neg?)						;-- hh:mm
 				]
 			] (type: time!)
+		]
+		
+		day-year-rule: [
+			s: opt #"-" 3 4 digit e: (year: make-number s e integer!)
+			| 1 2 digit e: (
+				value: make-number s e integer!
+				either day [year: value + pick [2000 1900] 50 > value][day: value]
+			)
+		]
+		
+		date-rule: [
+			ahead [opt #"-" 1 4 digit date-sep | 8 digit #"T"][ ;-- quick lookhead
+				s: 8 digit ee: #"T" (							;-- yyyymmddT
+					year:  make-number s e: skip s 4 integer!
+					month: make-number e e: skip e 2 integer!
+					day:   make-number e e: skip e 2 integer!
+					date:  make date! [day month year]
+				) :ee
+				| day-year-rule sep: date-sep (sep: sep/1) [
+					s: 1 2 digit e: (month: make-number s e integer!)
+					| case off month-rule (month: m)
+					| case off mon-rule   (month: m)
+				]
+				sep day-year-rule [if (not all [day month year]) fail | none] (
+					date: make date! [day month year]
+				)
+				| s: 4 digit #"-" (
+					year: make-number s skip s 4 integer!
+					date: make date! [1 1 year]
+				)[
+					"W" s: 2 digit (ee: none) opt [#"-" ee: non-zero] (	;-- yyyy-Www
+						date/isoweek: make-number s skip s 2 integer!
+						if ee [date/weekday: to integer! ee/1 - #"0"]	;-- yyyy-Www-d
+					)
+					| s: 3 digit (date/yearday: make-number s skip s 3 integer!) ;-- yyyy-ddd
+				] (month: -1)
+			](
+				type: date!
+				if all [
+					month <> -1 any [date/year <> year date/month <> month date/day <> day]
+				][throw-error [type pos]]
+				day: month: year: none
+			) opt [
+				time-sep (ee: no) [
+					s: 6 digit opt [#"." 1 9 digit ee:] (		;-- Thhmmss[.sss]
+						hour: make-number s e: skip s 2 integer!
+						mn:	  make-number e e: skip e 2 integer!
+						date/time: either ee [
+							sec: make-number e ee float!
+							make-hmsf hour mn sec
+						][
+							sec: make-number e e: skip e 2 integer!
+							make-hms hour mn sec
+						]
+					)
+					| 4 digit (									;-- Thhmm
+						hour: make-number s e: skip s 2 integer!
+						mn:	  make-number e e: skip e 2 integer!
+						date/time: make-hms hour mn 0
+					)
+					| s: positive-integer-rule (value: make-number s e integer!)
+					#":" [(neg?: no) time-rule (date/time: value) | (throw-error [type pos])]
+				]
+				opt [
+					#"Z" | [#"-" (neg?: yes) | #"+" (neg?: no)][
+						s: 4 digit (							;-- +/-hhmm
+							hour: make-number s e: skip s 2 integer!
+							mn:   make-number e e: skip e 2 integer!
+						)
+						| 1 2 digit e: (hour: make-number s e integer! mn: none) ;-- +/-h, +/-hh
+						opt [#":" s: 2 digit e: (mn: make-number s e integer!)]
+					]
+					(date/zone: make-hm either neg? [negate hour][hour] any [mn 0])
+				]
+			] sticky-word-rule (value: date)
 		]
 		
 		positive-integer-rule: [digit any digit e: (type: integer!)]
@@ -901,6 +920,7 @@ system/lexer: context [
 				| hexa-rule			(store stack make-hexa s e)
 				| binary-rule		if (value: make-binary s e base) (store stack value)
 				| email-rule		(store stack do make-file)
+				| date-rule			if (value) (store stack value)
 				| integer-rule		if (value) (store stack value)
 				| float-rule		if (value: make-float s e type) (store stack value)
 				| tag-rule			(store stack do make-string)
@@ -926,7 +946,7 @@ system/lexer: context [
 		any-value: [pos: any [some ws | literal-value]]
 		red-rules: [any-value any ws opt wrong-end]
 
-		if pre-load [do [pre-load src part]]
+		if pre-load [do [pre-load src length]]
 		
 		set/any 'err try [
 			unless either part [

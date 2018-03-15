@@ -95,6 +95,7 @@ float: context [
 			d		[int64!]
 			w0		[integer!]
 			temp	[float!]
+			tried?	[logic!]
 			pretty? [logic!]
 			percent? [logic!]
 	][
@@ -120,14 +121,14 @@ float: context [
 		s: "0000000000000000000000000000000"					;-- 32 bytes wide, big enough.
 		case [
 			any [type = FORM_FLOAT_32 type = FORM_PERCENT_32][
-				s/8: #"0"
-				s/9: #"0"
 				sprintf [s "%.7g" f]
 			]
-			type = FORM_TIME [									;-- nanosecond precision
-				s/10: #"0"
-				s/11: #"0"
-				sprintf [s "%.9g" f]
+			type = FORM_TIME [									;-- microsecond precision
+				either f < 10.0 [s0: "%.7g"][s0: "%.8g"]
+				sprintf [s s0 f]
+			]
+			type = FORM_PERCENT [
+				sprintf [s "%.13g" f]
 			]
 			true [
 				s/17: #"0"
@@ -136,6 +137,7 @@ float: context [
 			]
 		]
 
+		tried?: no
 		s0: s
 		until [
 			p:    null
@@ -177,14 +179,15 @@ float: context [
 					]
 				]
 
-				if pretty? [
+				if all [pretty? not tried?][
 					if any [									;-- correct '01' or '99' pattern
 						all [p0/2 = #"1" p0/1 = #"0"]
 						all [p0/2 = #"9" p0/1 = #"9"]
 					][
+						tried?: yes
 						s: case [
 							type = FORM_FLOAT_32 ["%.5g"]
-							type = FORM_TIME	 ["%.7g"]
+							type = FORM_TIME	 ["%.6g"]
 							true				 ["%.14g"]
 						]
 						sprintf [s0 s f]
@@ -233,7 +236,7 @@ float: context [
 			OP_MUL [left * right]
 			OP_DIV [
 				either all [0.0 = right not NaN? right][
-					either left >= 0.0 [+INF][-INF]
+					either left > 0.0 [+INF][either left = 0.0 [QNaN][-INF]]
 				][
 					left / right
 				]
@@ -342,16 +345,10 @@ float: context [
 		
 		t1?: all [type1 = TYPE_TIME type2 <> TYPE_TIME]
 		t2?: all [type1 <> TYPE_TIME type2 = TYPE_TIME]
-		
-		if t1? [op1: op1 * time/nano]
-		if t2? [op2: op2 * time/nano]
 
 		left/value: do-math-op op1 op2 type
 		
-		if any [t1? t2?][
-			left/header: TYPE_TIME
-			left/value: left/value * time/oneE9
-		]
+		if any [t1? t2?][left/header: TYPE_TIME]
 		if all [pct? not t2?][left/header: TYPE_PERCENT]
 		left
 	]
@@ -508,12 +505,10 @@ float: context [
 
 		either seed? [
 			s: f/value
-			if TYPE_OF(f) = TYPE_TIME [s: s / time/oneE9]
 			_random/srand as-integer s
 			f/header: TYPE_UNSET
 		][
 			s: (as-float _random/rand) / 2147483647.0
-			if s < 0.0 [s: 0.0 - s]
 			f/value: s * f/value
 		]
 		f
@@ -525,13 +520,14 @@ float: context [
 		type	[integer!]								;-- target type
 		return:	[red-float!]
 		/local
-			int [red-integer!]
-			tm	[red-time!]
-			_1	[integer!]
-			_2	[integer!]
-			_3	[integer!]
-			_4	[integer!]
-			val [red-value!]
+			int	 [red-integer!]
+			tm	 [red-time!]
+			str  [red-string!]
+			p	 [byte-ptr!]
+			err	 [integer!]
+			unit [integer!]
+			len	 [integer!]
+			s	 [series!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "float/to"]]
 
@@ -544,26 +540,20 @@ float: context [
 			]
 			TYPE_TIME [
 				tm: as red-time! spec
-				proto/value: tm/time / time/oneE9
+				proto/value: tm/time
 			]
 			TYPE_ANY_STRING [
-				_4: 0
-				val: as red-value! :_4
-				copy-cell spec val					;-- save spec, load-value will change it
-
-				proto: as red-float! load-value as red-string! spec
-				switch TYPE_OF(proto) [
-					TYPE_FLOAT	
-					TYPE_PERCENT [0]				;-- most common case
-					TYPE_INTEGER [
-						int: as red-integer! proto
-						proto/value: as float! int/value
-					]
-					default [
-						fire [TO_ERROR(script bad-to-arg) datatype/push type val]
-					]
-				]
-				proto/header: type
+				err: 0
+				str: as red-string! spec
+				s: GET_BUFFER(str)
+				unit: GET_UNIT(s)
+				p: (as byte-ptr! s/offset) + (str/head << log-b unit)
+				len: (as-integer s/tail - p) >> log-b unit
+				
+				either len > 0 [
+					proto/value: tokenizer/scan-float p len unit :err
+				][err: -1]
+				if err <> 0 [fire [TO_ERROR(script bad-to-arg) datatype/push type spec]]
 			]
 			TYPE_BINARY [
 				proto/value: from-binary as red-binary! spec
@@ -717,7 +707,7 @@ float: context [
 		#if debug? = yes [if verbose > 0 [print-line "float/compare"]]
 
 		if all [
-			any [op = COMP_SAME op = COMP_STRICT_EQUAL]
+			any [op = COMP_FIND op = COMP_SAME op = COMP_STRICT_EQUAL]
 			TYPE_OF(value1) <> TYPE_OF(value2)
 		][return 1]
 
@@ -807,9 +797,15 @@ float: context [
 			base [red-float!]
 			exp  [red-float!]
 			int	 [red-integer!]
+			type [integer!]
 	][
 		base: as red-float! stack/arguments
 		exp: base + 1
+		type: TYPE_OF(exp)
+		
+		if all [type <> TYPE_INTEGER type <> TYPE_FLOAT][
+			ERR_EXPECT_ARGUMENT(type 1)
+		]
 		if TYPE_OF(exp) = TYPE_INTEGER [
 			int: as red-integer! exp
 			exp/value: as-float int/value

@@ -91,6 +91,8 @@ natives: context [
 		/local
 			value [red-value!]
 			tail  [red-value!]
+			bool  [red-logic!]
+			type  [integer!]
 	][
 		#typecheck any
 		value: block/rs-head as red-block! stack/arguments
@@ -98,7 +100,10 @@ natives: context [
 		
 		while [value < tail][
 			value: interpreter/eval-next value tail no
-			if logic/true? [exit]
+			
+			bool: as red-logic! stack/arguments
+			type: TYPE_OF(bool)
+			unless any [type = TYPE_NONE all [type = TYPE_LOGIC not bool/value]][exit]
 		]
 		RETURN_NONE
 	]
@@ -314,7 +319,7 @@ natives: context [
 		/local
 			w	   [red-word!]
 			body   [red-block!]
-			saved  [red-value!]
+			saved  [red-series!]
 			series [red-series!]
 			type   [integer!]
 			break? [logic!]
@@ -323,15 +328,21 @@ natives: context [
 		w:    as red-word!  stack/arguments
 		body: as red-block! stack/arguments + 1
 		
-		saved: word/get w							;-- save series (for resetting on end)
+		saved: as red-series! word/get w				;-- save series (for resetting on end)
 		type: TYPE_OF(saved)
 		unless ANY_SERIES?(type) [ERR_EXPECT_ARGUMENT(type 0)]
 		
-		w: word/push w								;-- word argument
+		w: word/push w									;-- word argument
 		break?: no
 		
 		stack/mark-loop words/_body
-		while [loop? as red-series! _context/get w][
+		while [
+			series: as red-series! _context/get w
+			if series/node <> saved/node [
+				fire [TO_ERROR(script bad-loop-series) series]
+			]
+			loop? series
+		][
 			stack/reset
 			catch RED_THROWN_BREAK	[interpreter/eval body no]
 			switch system/thrown [
@@ -349,7 +360,7 @@ natives: context [
 			]
 		]
 		stack/unwind-last
-		unless break? [_context/set w saved]
+		unless break? [_context/set w as red-value! saved]
 	]
 	
 	remove-each*: func [
@@ -402,14 +413,17 @@ natives: context [
 			null
 			0
 			null
-		stack/set-last stack/top - 1
+		stack/set-last stack/get-top
 	]
 	
-	function*: func [check? [logic!]][
+	function*: func [
+		check? [logic!]
+		/local spec [red-block!]
+	][
 		#typecheck function
-		_function/collect-words
-			as red-block! stack/arguments
-			as red-block! stack/arguments + 1
+		spec: block/clone as red-block! stack/arguments no no	;-- copy it before modifying it
+		copy-cell as red-value! spec stack/arguments
+		_function/collect-words	spec as red-block! stack/arguments + 1
 		func* check?
 	]
 	
@@ -425,7 +439,8 @@ natives: context [
 		/local blk [red-block!]
 	][
 		#typecheck has
-		blk: as red-block! stack/arguments
+		blk: block/clone as red-block! stack/arguments no no
+		blk: as red-block! copy-cell as red-value! blk stack/arguments
 		block/insert-value blk as red-value! refinements/local
 		blk/head: blk/head - 1
 		func* check?
@@ -599,19 +614,12 @@ natives: context [
 		/local
 			w	   [red-word!]
 			value  [red-value!]
-			res	   [red-value!]
 			blk	   [red-block!]
-			obj	   [red-object!]
-			ctx	   [red-context!]
-			old	   [red-value!]
-			slot   [red-value!]
-			type   [integer!]
-			s	   [series!]
-			node   [node!]
 			only?  [logic!]
 			some?  [logic!]
 	][
 		#typecheck [set any? case? _only? _some?]
+		
 		w: as red-word! stack/arguments
 		value: stack/arguments + 1
 		only?: _only? <> -1
@@ -640,19 +648,7 @@ natives: context [
 				stack/set-last value
 			]
 			default [
-				node: w/ctx
-				ctx: TO_CTX(node)
-				s: as series! ctx/self/value
-				obj: as red-object! s/offset + 1
-				
-				either all [TYPE_OF(obj) = TYPE_OBJECT obj/on-set <> null][
-					slot: _context/get w
-					old: stack/push slot
-					copy-cell value slot
-					object/fire-on-set obj w old value
-				][
-					_context/set w value
-				]
+				_context/set w value
 				stack/set-last value
 			]
 		]
@@ -892,6 +888,7 @@ natives: context [
 			value [red-value!]
 			tail  [red-value!]
 			arg	  [red-value!]
+			type  [integer!]
 			into? [logic!]
 			blk?  [logic!]
 	][
@@ -916,11 +913,23 @@ natives: context [
 		either blk? [
 			while [value < tail][
 				value: interpreter/eval-next value tail yes
+				clear-newline stack/arguments + 1
 				either into? [actions/insert* -1 0 -1][block/append*]
 				stack/keep									;-- preserve the reduced block on stack
 			]
 		][
-			interpreter/eval-expression arg arg + 1 no yes no ;-- for non block! values
+			type: TYPE_OF(arg)
+			either any [
+				type = TYPE_FUNCTION
+				type = TYPE_NATIVE
+				type = TYPE_ACTION
+				type = TYPE_OP
+				type = TYPE_ROUTINE
+			][
+				stack/set-last arg
+			][
+				interpreter/eval-expression arg arg + 1 no yes no ;-- for non block! values
+			]
 			if into? [actions/insert* -1 0 -1]
 		]
 		stack/unwind-last
@@ -1261,6 +1270,10 @@ natives: context [
 			TYPE_STRING  [string/do-set-op case? as red-integer! skip-arg op]
 			TYPE_BITSET  [bitset/do-bitwise op]
 			TYPE_TYPESET [typeset/do-bitwise op]
+			TYPE_DATE	 [
+				if op <> OP_DIFFERENCE [ERR_EXPECT_ARGUMENT(type 1)]
+				date/difference? as red-date! set1 as red-date! set2
+			]
 			default 	 [ERR_EXPECT_ARGUMENT(type 1)]
 		]
 	]
@@ -1555,21 +1568,31 @@ natives: context [
 		/local
 			data [red-integer!]
 			bits [red-integer!]
+			pos	 [integer!]
+			res	 [integer!]
 	][
 		#typecheck [shift left logical]
 		data: as red-integer! stack/arguments
 		bits: data + 1
-		case [
+		pos: bits/value
+		if pos < 0 [pos: 0]
+		
+		res: case [
 			left >= 0 [
-				data/value: data/value << bits/value
+				either pos > 31 [0][data/value << pos]
 			]
 			logical >= 0 [
-				data/value: data/value >>> bits/value
+				either pos > 31 [0][data/value >>> pos]
 			]
 			true [
-				data/value: data/value >> bits/value
+				either pos > 31 [
+					either data/value < 0 [-1][0]
+				][
+					data/value >> pos
+				]
 			]
 		]
+		data/value: res
 	]
 
 	to-hex*: func [
@@ -1843,7 +1866,7 @@ natives: context [
 			err	[red-object!]
 			id  [integer!]
 	][
-		err: as red-object! stack/top - 1
+		err: as red-object! stack/get-top
 		assert TYPE_OF(err) = TYPE_ERROR
 		id: error/get-type err
 		either id = words/errors/throw/symbol [			;-- check if error is of type THROW
@@ -2034,7 +2057,7 @@ natives: context [
 				]
 			]
 			system/thrown: 0
-			stack/set-last stack/top - 1
+			stack/set-last stack/get-top
 			stack/top: stack/arguments + 1
 		]
 	]
@@ -2095,7 +2118,7 @@ natives: context [
 				time: as-integer ftime
 			]
 			TYPE_TIME [
-				time: as-integer (val/value / #either OS = 'Windows [1E6][1E3])
+				time: as-integer (val/value * #either OS = 'Windows [1E3][1E6])
 			]
 			default [fire [TO_ERROR(script invalid-arg) val]]
 		]
@@ -2154,7 +2177,7 @@ natives: context [
 		;-- Trying to use /with in combination with TCP or CRC32 is an error.
 		if all [
 			_with >= 0
-			any [type = crypto/_crc32  type = crypto/_tcp]
+			any [type = crypto/_crc32 type = crypto/_tcp type = crypto/_adler32]
 		][
 			ERR_INVALID_REFINEMENT_ARG((refinement/load "with") method)
 		]
@@ -2163,6 +2186,7 @@ natives: context [
 		;	we process them and exit. No other dispatching needed.
 		if type = crypto/_crc32 [integer/box crypto/CRC32 data len   exit]
 		if type = crypto/_tcp   [integer/box crypto/CRC_IP data len  exit]
+		if type = crypto/_adler32 [integer/box crypto/adler32 data len exit]
 
 		
 		either _with >= 0 [								;-- /with was used
@@ -2401,20 +2425,48 @@ natives: context [
 		day		[integer!]
 		time	[integer!]
 		zone	[integer!]
-		date	[integer!]
+		_date	[integer!]
 		weekday	[integer!]
 		yearday	[integer!]
 		precise	[integer!]
 		utc		[integer!]
 		/local
 			dt	[red-date!]
+			int [red-integer!]
+			tm	[float!]
+			n	[integer!]
 	][
-		#typecheck [now year month day time zone date weekday yearday precise utc]
-		if time = -1 [--NOT_IMPLEMENTED--]
+		#typecheck [now year month day time zone _date weekday yearday precise utc]
 
 		dt: as red-date! stack/arguments
-		dt/header: TYPE_TIME
-		dt/time: platform/get-time utc >= 0 precise >= 0
+		dt/header: TYPE_DATE
+		dt/date: platform/get-date utc >= 0
+		if _date > -1 [dt/time: 0.0 exit]
+		dt/date: DATE_SET_TIME_FLAG(dt/date)
+		
+		tm: platform/get-time yes precise >= 0
+		date/normalize-time 0 :tm DATE_GET_ZONE(dt/date)
+		dt/time: tm
+		n: 0
+		case [
+			year    > -1 [n: 2]
+			month   > -1 [n: 3]
+			day     > -1 [n: 4]
+			zone    > -1 [n: 5]
+			time    > -1 [n: 6]
+			weekday > -1 [n: 10]
+			yearday > -1 [
+				int: as red-integer! dt
+				int/header: TYPE_INTEGER
+				int/value: date/get-yearday dt/date
+				exit
+			]
+			true [exit]
+		]
+		if n > 0 [
+			stack/keep
+			stack/set-last date/push-field dt n
+		]
 	]
 	
 	as*: func [
@@ -2491,6 +2543,88 @@ natives: context [
 		unless OPTION?(err)[err: null]
 		
 		ext-process/call cmd wait > -1 show > -1 console > -1 shell > -1 in out err
+	]
+
+	browse*: func [
+		check?	[logic!]
+		/local
+			url [red-string!]
+			src [red-string!]
+	][
+		#typecheck browse
+
+		src: as red-string! stack/arguments
+		either TYPE_OF(src) = TYPE_FILE [
+			url: string/rs-make-at stack/push* string/rs-length? src
+			file/to-local-path as red-file! src url no
+		][url: src]
+
+		#switch OS [
+			Windows [
+				platform/ShellExecute 0 #u16 "open" unicode/to-utf16 url 0 0 1
+				unset/push-last
+			]
+			macOS [
+				use [s [c-string!] cmd [byte-ptr!] len [integer!]][
+					len: -1
+					s: unicode/to-utf8 url :len
+					cmd: allocate 6 + len
+					copy-memory cmd as byte-ptr! "open " 5
+					copy-memory cmd + 5 as byte-ptr! s len + 1
+					ext-process/OS-call as-c-string cmd no no no yes null null null
+					free cmd
+				]
+			]
+			#default [fire [TO_ERROR(internal not-here) words/_browse]]
+		]
+	]
+
+	decompress*: func [
+		check?	 [logic!]
+		zlib	 [integer!]
+		_deflate [integer!]
+		/local
+			arg		[red-binary!]
+			sz		[red-integer!]
+			src		[byte-ptr!]
+			srclen	[integer!]
+			res		[integer!]
+			dst		[red-binary! value]
+			dstlen	[integer!]
+			s		[series!]
+			buf		[byte-ptr!]
+	][
+		#typecheck [decompress zlib _deflate]
+		arg: as red-binary! stack/arguments
+		src: binary/rs-head arg
+		srclen: binary/rs-length? arg
+
+		case [
+			zlib > 0 [
+				sz: as red-integer! arg + zlib
+				dstlen: sz/value
+			]
+			_deflate > 0 [
+				sz: as red-integer! arg + _deflate
+				dstlen: sz/value
+			]
+			true [
+				dstlen: 0
+				gzip-uncompress null :dstlen src srclen
+			]
+		]
+
+		binary/make-at as red-value! dst dstlen
+		s: GET_BUFFER(dst)
+		buf: as byte-ptr! s/offset
+		res: case [
+			zlib > 0		[zlib-uncompress buf :dstlen src srclen]
+			_deflate > 0	[deflate/uncompress buf :dstlen src srclen]
+			true			[gzip-uncompress buf :dstlen src srclen]
+		]
+		if res <> 0 [fire [TO_ERROR(script invalid-data)]]
+		s/tail: as cell! (buf + dstlen)
+		stack/set-last as red-value! dst
 	]
 
 	;--- Natives helper functions ---
@@ -2685,7 +2819,6 @@ natives: context [
 			type [integer!]
 			img  [red-image!]
 	][
-	
 		type: TYPE_OF(series)
 		if type = TYPE_IMAGE [
 			img: as red-image! series
@@ -2726,7 +2859,7 @@ natives: context [
 	][
 		i: 1
 		type: TYPE_OF(value)
-		block?: any [type = TYPE_BLOCK type = TYPE_HASH type = TYPE_MAP]
+		block?: any [type = TYPE_BLOCK type = TYPE_PAREN type = TYPE_HASH type = TYPE_MAP]
 		if block? [blk: as red-block! value]
 		
 		while [i <= size][
@@ -2915,12 +3048,15 @@ natives: context [
 		return: [logic!]
 		/local
 			series [red-series!]
+			saved  [red-series!]
 			word   [red-word!]
 	][
 		word: as red-word! stack/arguments - 1
 		assert TYPE_OF(word) = TYPE_WORD
 
 		series: as red-series! _context/get word
+		saved: as red-series! stack/arguments - 2
+		if series/node <> saved/node [fire [TO_ERROR(script bad-loop-series) series]]
 		loop? series
 	]
 	
@@ -3098,6 +3234,8 @@ natives: context [
 			:call*
 			:zero?*
 			:size?*
+			:browse*
+			:decompress*
 		]
 	]
 

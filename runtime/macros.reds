@@ -58,11 +58,11 @@ Red/System [
 	TYPE_TAG											;-- 2C		44
 	TYPE_EMAIL											;-- 2D		45
 	TYPE_HANDLE											;-- 2E		46
-	TYPE_IMAGE											;-- 2F		47
+	TYPE_DATE											;-- 2F		47
+	TYPE_IMAGE											;-- 30		48		;-- needs to be last
 	TYPE_EVENT											
 	TYPE_CLOSURE
 	TYPE_PORT
-	
 ]
 
 #enum actions! [
@@ -241,6 +241,8 @@ Red/System [
 	NAT_CALL
 	NAT_ZERO?
 	NAT_SIZE?
+	NAT_BROWSE
+	NAT_DECOMPRESS
 ]
 
 #enum math-op! [
@@ -272,6 +274,8 @@ Red/System [
 	COMP_SORT
 	COMP_CASE_SORT
 	COMP_SAME
+	COMP_STRICT_EQUAL_WORD							;-- same as STRICT_EQUAL, but relaxed type matching for words
+	COMP_FIND
 ]
 
 #enum exceptions! [
@@ -372,6 +376,7 @@ Red/System [
 	any [
 		type = TYPE_BLOCK
 		type = TYPE_HASH
+		type = TYPE_VECTOR
 		type = TYPE_PAREN
 		type = TYPE_PATH
 		type = TYPE_LIT_PATH
@@ -410,6 +415,14 @@ Red/System [
 	]
 ]
 
+#define ANY_LIST(type)	[
+	any [
+		type = TYPE_BLOCK
+		type = TYPE_PAREN
+		type = TYPE_HASH
+	]
+]
+
 #define ANY_PATH?(type)	[
 	any [
 		type = TYPE_PATH
@@ -426,6 +439,15 @@ Red/System [
 		type = TYPE_URL
 		type = TYPE_TAG
 		type = TYPE_EMAIL
+	]
+]
+
+#define ANY_WORD?(type) [
+	any [
+		type = TYPE_WORD
+		type = TYPE_SET_WORD
+		type = TYPE_GET_WORD
+		type = TYPE_LIT_WORD
 	]
 ]
 

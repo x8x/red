@@ -198,7 +198,7 @@ word: context [
 			value  [red-value!]
 			values [series!]
 	][
-		value: stack/top - 1
+		value: stack/get-top
 		ctx: TO_CTX(node)
 		values: as series! ctx/values/value
 		stack/push values/offset + index
@@ -213,7 +213,7 @@ word: context [
 			value  [red-value!]
 			values [series!]
 	][
-		value: stack/top - 1
+		value: stack/get-top
 		ctx: TO_CTX(node)
 		values: as series! ctx/values/value
 		copy-cell value values/offset + index
@@ -288,6 +288,29 @@ word: context [
 		str/cache: null
 		str
 	]
+	
+	check-1st-char: func [
+		w [red-word!]
+		/local
+			sym [red-symbol!]
+			buf	[series!]
+			s   [c-string!]
+			cp  [integer!]
+			c   [byte!]
+	][
+		sym: symbol/get w/symbol
+		buf: as series! sym/node/value
+		cp: string/get-char as byte-ptr! buf/offset GET_UNIT(buf)
+		if cp > 127 [exit]
+		c: as-byte cp
+		
+		s: {/\^^,[](){}"#%$@:;'0123465798}
+		until [
+			if c = s/1 [fire [TO_ERROR(syntax bad-char) w]]
+			s: s + 1
+			s/1 = null-byte
+		]
+	]
 
 	;-- Actions --
 	
@@ -338,10 +361,8 @@ word: context [
 			char	[red-char!]
 			dt		[red-datatype!]
 			bool	[red-logic!]
+			str		[red-string!]
 			name	[names!]
-			idx		[integer!]
-			buf1	[integer!]
-			data	[byte-ptr!]
 			cstr	[c-string!]
 			len		[integer!]
 			val		[red-value!]
@@ -353,8 +374,11 @@ word: context [
 			TYPE_SET_WORD
 			TYPE_GET_WORD
 			TYPE_LIT_WORD
-			TYPE_REFINEMENT
-			TYPE_ISSUE [proto: spec]
+			TYPE_REFINEMENT [proto: spec]
+			TYPE_ISSUE [
+				check-1st-char as red-word! spec
+				proto: spec
+			]
 			TYPE_STRING [
 				len: 0
 				val: as red-value! :len
@@ -364,12 +388,10 @@ word: context [
 			]
 			TYPE_CHAR [
 				char: as red-char! spec
-				buf1: 0
-				data: as byte-ptr! :buf1
-				len: unicode/cp-to-utf8 char/value data
-				idx: len + 1
-				data/idx: null-byte
-				make-at symbol/make as c-string! data proto
+				str: string/make-at stack/push* 1 Latin1
+				string/append-char GET_BUFFER(str) char/value
+				proto: load-value str
+				unless any-word? TYPE_OF(proto) [fire [TO_ERROR(syntax bad-char) str]]
 			]
 			TYPE_DATATYPE [
 				dt: as red-datatype! spec
@@ -415,6 +437,7 @@ word: context [
 			str2 [red-string!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "word/compare"]]
+		
 		type: TYPE_OF(arg2)
 		if any [
 			all [type = TYPE_ISSUE TYPE_OF(arg1) <> TYPE_ISSUE]
@@ -424,7 +447,8 @@ word: context [
 		]
 		switch op [
 			COMP_EQUAL
-			COMP_NOT_EQUAL [
+			COMP_NOT_EQUAL
+			COMP_FIND [
 				res: as-integer not EQUAL_WORDS?(arg1 arg2)
 			]
 			COMP_SAME
@@ -432,6 +456,16 @@ word: context [
 				res: as-integer any [
 					type <> TYPE_OF(arg1)
 					arg1/symbol <> arg2/symbol
+				]
+			]
+			COMP_STRICT_EQUAL_WORD [
+				either any [
+					all [TYPE_OF(arg1) = TYPE_WORD type = TYPE_LIT_WORD]
+					all [TYPE_OF(arg1) = TYPE_LIT_WORD type = TYPE_WORD]
+				][
+					res: as-integer arg1/symbol <> arg2/symbol
+				][
+					res: as-integer any [type <> TYPE_OF(arg1) arg1/symbol <> arg2/symbol]
 				]
 			]
 			default [

@@ -101,6 +101,7 @@ red: context [
 	#include %datatypes/tag.reds
 	#include %datatypes/email.reds
 	#include %datatypes/handle.reds
+	#include %datatypes/date.reds
 	#if OS = 'Windows [#include %datatypes/image.reds]	;-- temporary
 	#if OS = 'macOS   [#include %datatypes/image.reds]	;-- temporary
 
@@ -116,11 +117,13 @@ red: context [
 	#include %crypto.reds
 	#include %stack.reds
 	#include %interpreter.reds
+	#include %tokenizer.reds
 	#include %simple-io.reds							;-- temporary file IO support
 	#include %clipboard.reds
 	#include %redbin.reds
 	#include %utils.reds
 	#include %call.reds
+	#include %inflate.reds
 
 	_root:	 	declare red-block!						;-- statically alloc root cell for bootstrapping
 	root:	 	as red-block! 0							;-- root block
@@ -184,6 +187,7 @@ red: context [
 		tag/init
 		email/init
 		handle/init
+		date/init
 		#if OS = 'Windows [image/init]					;-- temporary
 		#if OS = 'macOS   [image/init]					;-- temporary
 		
@@ -255,6 +259,7 @@ red: context [
 			tag/verbose:		verbosity
 			email/verbose:		verbosity
 			handle/verbose:		verbosity
+			date/verbose:		verbosity
 			#if OS = 'Windows [image/verbose: verbosity]
 			#if OS = 'macOS   [image/verbose: verbosity]
 

@@ -76,7 +76,9 @@ EXTERN_C
 	red_tuple	redTuple(long r, long g, long b);
 	red_tuple	redTuple4(long r, long g, long b, long a);
 	red_binary	redBinary(const char* buffer, long bytes);
+#if defined(_WIN32) || defined(__APPLE__)
 	red_image	redImage(long width, long height, const void* buffer, long format);
+#endif
 	red_string	redString(const char* string);
 	red_word	redWord(const char* word);
 	red_block	redBlock(red_value v, ...);
@@ -115,6 +117,10 @@ EXTERN_C
 /* Access to a Red path */
 	red_value	redSetPath(red_path path, red_value value);
 	red_value	redGetPath(red_path path);
+
+/* Access to a Red object/map/struct field */
+	red_value	redSetField(red_value obj, long field, red_value value);
+	red_value	redGetField(red_value obj, long field);
 
 /* Debugging */
 	void		redPrint(red_value value);
@@ -184,7 +190,8 @@ typedef enum
 	RED_TYPE_TAG,
 	RED_TYPE_EMAIL,
 	RED_TYPE_IMAGE,
-	RED_TYPE_EVENT
+	RED_TYPE_EVENT,
+	RED_TYPE_DATE,
 	// RED_TYPE_CLOSURE,
 	// RED_TYPE_PORT
 } RedType;
