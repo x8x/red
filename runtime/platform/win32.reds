@@ -341,6 +341,15 @@ platform: context [
 				return:		 [integer!]
 			]
 		]
+		"user32.dll" stdcall [
+			MessageBox: "MessageBoxA" [
+				hWnd		[handle!]
+				lpText		[c-string!]
+				lpCaption	[c-string!]
+				uType		[integer!]
+				return:		[integer!]
+			]
+		]
 	]
 
 	#either sub-system = 'gui [
@@ -351,6 +360,14 @@ platform: context [
 		]
 	][
 		#include %win32-cli.reds
+	]
+	
+	alert-error: func [
+		msg [c-string!]
+	][
+?? msg	
+		probe MessageBox null msg null 00h			;-- MB_OK or MB_ICONEXCLAMATION
+		probe GetLastError
 	]
 
 	;-------------------------------------------
@@ -365,7 +382,9 @@ platform: context [
 		prot: either exec? [VA_PAGE_RWX][VA_PAGE_RW]
 
 		ptr: VirtualAlloc null size VA_COMMIT_RESERVE prot
-		if ptr = null [throw OS_ERROR_VMEM_OUT_OF_MEMORY]
+		if ptr = null [
+			throw OS_ERROR_VMEM_OUT_OF_MEMORY
+		]
 		ptr
 	]
 

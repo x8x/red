@@ -667,22 +667,43 @@ natives: context [
 			arg		[red-value!]
 			str		[red-string!]
 			blk		[red-block!]
+			err		[red-object!]
 			series	[series!]
 			offset	[byte-ptr!]
 			size	[integer!]
 			unit	[integer!]
+			msg		[c-string!]
 	][
 		#if debug? = yes [if verbose > 0 [print-line "native/prin"]]
 		#typecheck -prin-									;-- `prin` would be replaced by lexer
 		arg: stack/arguments
 
-		if TYPE_OF(arg) = TYPE_BLOCK [
-			block/rs-clear buffer-blk
-			stack/push as red-value! buffer-blk
-			assert stack/top - 2 = stack/arguments			;-- check for correct stack layout
-			reduce* no 1
-			blk: as red-block! arg
-			blk/head: 0										;-- head changed by reduce/into
+		switch TYPE_OF(arg) [
+			TYPE_BLOCK [
+				block/rs-clear buffer-blk
+				stack/push as red-value! buffer-blk
+				assert stack/top - 2 = stack/arguments		;-- check for correct stack layout
+				reduce* no 1
+				blk: as red-block! arg
+				blk/head: 0									;-- head changed by reduce/into
+			]
+			TYPE_ERROR [
+				err: as red-object! arg
+probe "printing error"
+				if error/out-of-memory? error/get-type err error/get-id err [
+probe "out of memory err"				
+					msg: "*** Error: out of memory"
+					;#either sub-system = 'gui [
+						platform/alert-error msg
+					;][
+					;	print-line msg
+					;]
+					last-lf?: no
+					stack/set-last unset-value
+					exit
+				]
+			]
+			default [0]
 		]
 
 		if TYPE_OF(arg) <> TYPE_STRING [actions/form* -1]
@@ -1865,12 +1886,12 @@ natives: context [
 	handle-thrown-error: func [
 		/local
 			err	[red-object!]
-			id  [integer!]
+			id  [red-word!]
 	][
 		err: as red-object! stack/get-top
 		assert TYPE_OF(err) = TYPE_ERROR
 		id: error/get-type err
-		either id = words/errors/throw/symbol [			;-- check if error is of type THROW
+		either id/symbol = words/errors/throw/symbol [	;-- check if error is of type THROW
 			re-throw 									;-- let the error pass through
 		][
 			stack/adjust-post-try

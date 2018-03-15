@@ -544,6 +544,7 @@ words: context [
 	
 	system:			-1
 	system-global:	-1
+	no-memory:		-1
 
 	_body:			as red-word! 0
 	_windows:		as red-word! 0
@@ -755,6 +756,7 @@ words: context [
 		
 		system:			symbol/make "system"
 		system-global:	symbol/make "system-global"
+		no-memory:		symbol/make "no-memory"
 
 		_windows:		_context/add-global windows
 		_syllable:		_context/add-global syllable

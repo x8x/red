@@ -257,6 +257,7 @@ system: context [
 			]
 		]
 
+		no-memory: none
 	]
 	
 	state: context [

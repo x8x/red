@@ -37,12 +37,16 @@ error: context [
 	
 	get-type: func [
 		err		[red-object!]
-		return: [integer!]
-		/local
-			type [red-word!]
+		return: [red-word!]
 	][
-		type: as red-word! (object/get-values err) + field-type
-		type/symbol
+		as red-word! (object/get-values err) + field-type
+	]
+	
+	get-id: func [
+		err		[red-object!]
+		return: [red-word!]
+	][
+		as red-word! (object/get-values err) + field-id
 	]
 	
 	get-stack-id: func [return: [integer!]][field-stack]
@@ -90,6 +94,19 @@ error: context [
 		words/_anon										;-- return anonymous name
 	]
 	
+	out-of-memory?: func [
+		cat		[red-word!]
+		id		[red-word!]
+		return: [logic!]
+	][
+		all [
+			TYPE_OF(cat) = TYPE_WORD
+			TYPE_OF(id)  = TYPE_WORD
+			words/errors/internal/symbol = symbol/resolve cat/symbol
+			words/no-memory = symbol/resolve id/symbol
+		]
+	]
+	
 	create: func [
 		cat		[red-value!]							;-- expects a word!
 		id		[red-value!]							;-- expects a word!
@@ -102,11 +119,15 @@ error: context [
 			base [red-value!]
 			blk	 [red-block!]
 	][
-		blk: block/push* 2
-		block/rs-append blk cat
-		block/rs-append blk id
-	
-		err:  make null as red-value! blk TYPE_ERROR
+		either out-of-memory? as red-word! cat as red-word! id [
+			err: as red-object! #get system/catalog/no-memory
+		][
+			blk: block/push* 2
+			block/rs-append blk cat
+			block/rs-append blk id
+
+			err:  make null as red-value! blk TYPE_ERROR
+		]
 		base: object/get-values err
 		
 		unless null? arg1 [copy-cell arg1 base + field-arg1]

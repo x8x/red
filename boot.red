@@ -48,6 +48,8 @@ Red [
 	][
 		append any [attempt [to-red-file get-env "HOME"] %/tmp] %/.red/
 	]
+	
+	system/catalog/no-memory: make error! [type: 'internal id: 'no-memory]
 ]
 
 ;-- command-line arguments processing

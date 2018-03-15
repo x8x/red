@@ -397,8 +397,8 @@ stack: context [										;-- call stack
 	throw-error: func [
 		err [red-object!]
 		/local
-			extra [red-value!]
-			all?  [logic!]
+			extra  [red-value!]
+			all?   [logic!]
 	][
 		if ctop > cbottom [
 			error/set-where err as red-value! get-call
