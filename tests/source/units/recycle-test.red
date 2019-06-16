@@ -564,6 +564,8 @@ Red [
 		rv2-mem: stats
 		
 		loop 500 [
+call/output "cat /proc/self/maps" s: ""
+print s
 			rv2-vec: make vector! 500000
 			rv2-vec: none
 			recycle
