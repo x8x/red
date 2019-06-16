@@ -86,7 +86,7 @@ platform: context [
 		size: round-to-next size 16
 		assert zero? (size and 0Fh)				;-- size is a multiple of 16
 		prot: either exec? [MMAP_PROT_RWX][MMAP_PROT_RW]
-
+probe ["allocating: " size]
 		ptr: mmap 
 			null 
 			size
@@ -94,7 +94,7 @@ platform: context [
 			MMAP_MAP_PRIVATE or MMAP_MAP_ANONYMOUS
 			-1									;-- portable value
 			0
-
+?? ptr
 		if -12 = as-integer ptr [throw OS_ERROR_VMEM_OUT_OF_MEMORY]
 		as int-ptr! ptr
 	]
@@ -105,6 +105,7 @@ platform: context [
 	free-virtual: func [
 		ptr [int-ptr!]							;-- address of memory region to release
 	][
+probe ["freeing region: " ptr]
 		if -1 = munmap as byte-ptr! ptr ptr/value [
 			throw OS_ERROR_VMEM_RELEASE_FAILED
 		]
