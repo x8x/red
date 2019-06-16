@@ -81,21 +81,15 @@ platform: context [
 		size 	[integer!]						;-- allocated size in bytes (page size multiple)
 		exec? 	[logic!]						;-- TRUE => executable region
 		return: [int-ptr!]						;-- allocated memory region pointer
-		/local ptr prot
+		/local ptr [byte-ptr!]
 	][
 		size: round-to-next size 16
 		assert zero? (size and 0Fh)				;-- size is a multiple of 16
-		prot: either exec? [MMAP_PROT_RWX][MMAP_PROT_RW]
+		;prot: either exec? [MMAP_PROT_RWX][MMAP_PROT_RW]
 
-		ptr: mmap 
-			null 
-			size
-			prot	
-			MMAP_MAP_PRIVATE or MMAP_MAP_ANONYMOUS
-			-1									;-- portable value
-			0
+		ptr: allocate size
 
-		if -12 = as-integer ptr [throw OS_ERROR_VMEM_OUT_OF_MEMORY]
+		if null? ptr [throw OS_ERROR_VMEM_OUT_OF_MEMORY]
 		as int-ptr! ptr
 	]
 
@@ -105,11 +99,8 @@ platform: context [
 	free-virtual: func [
 		ptr [int-ptr!]							;-- address of memory region to release
 	][
-		if -1 = munmap as byte-ptr! ptr ptr/value [
-			throw OS_ERROR_VMEM_RELEASE_FAILED
-		]
+		free as byte-ptr! ptr
 	]
-	
 	
 	init: does [
 		page-size: sysconf SC_PAGE_SIZE			;@@ add error checking!
