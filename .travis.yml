@@ -1,7 +1,7 @@
 # Only use continuous integration on the master branch
 branches:
   only:
-    - master
+    - ARM
 
 
 notifications:
@@ -9,12 +9,12 @@ notifications:
     # Send notifications on every build failure to comitter and author.
     # Never send notifications for sucessful builds.
     on_success: never
-  webhooks:
-    urls:
-    - https://webhooks.gitter.im/e/f9318a4a24c9157f20d1
-    on_success: change  # options: [always|never|change] default: always
-    on_failure: always  # options: [always|never|change] default: always
-    on_start: false     # default: false
+#   webhooks:
+#     urls:
+#     - https://webhooks.gitter.im/e/f9318a4a24c9157f20d1
+#     on_success: change  # options: [always|never|change] default: always
+#     on_failure: always  # options: [always|never|change] default: always
+#     on_start: false     # default: false
 
 
 # Disables Travis CI's Ruby-specific defaults.
@@ -24,7 +24,7 @@ language: c
 env:
   global:
     - STATUS=1
-    - secure: "IHmQUKT/8TJ2Qx/AXzyQBruJqGeDvFUwTby8EIDmA+v8/ypJ5VrWDU4w11cdSsgm3+U5w48F9eKq4avQiVFffcY0Z6vpKPbuPn1/AkAHB1qYB20QsOvNrHBGfMGvfu+exNCY8qIifLLGCPYriG84hgW7QHEWLw2NruFLr4HBQ5s="
+    # - secure: "IHmQUKT/8TJ2Qx/AXzyQBruJqGeDvFUwTby8EIDmA+v8/ypJ5VrWDU4w11cdSsgm3+U5w48F9eKq4avQiVFffcY0Z6vpKPbuPn1/AkAHB1qYB20QsOvNrHBGfMGvfu+exNCY8qIifLLGCPYriG84hgW7QHEWLw2NruFLr4HBQ5s="
 
 
 matrix:
@@ -34,18 +34,18 @@ matrix:
 
 
   ### Linux ############################################################
-  - os: linux
-    dist: trusty
-    sudo: required
-    env: OS=linux
-    script:                                             # Run i386 tests
-    - >
-      docker run -v ${PWD}:/red -w /red
-      i386/debian:red rebol -qws tests/run-all.r --batch
-    - mv quick-test/quick-test.log quick-test/quick-test-red.log
-    - >
-      docker run -v ${PWD}:/red -w /red
-      i386/debian:red rebol -qws system/tests/run-all.r --batch
+#   - os: linux
+#     dist: trusty
+#     sudo: required
+#     env: OS=linux
+#     script:                                             # Run i386 tests
+#     - >
+#       docker run -v ${PWD}:/red -w /red
+#       i386/debian:red rebol -qws tests/run-all.r --batch
+#     - mv quick-test/quick-test.log quick-test/quick-test-red.log
+#     - >
+#       docker run -v ${PWD}:/red -w /red
+#       i386/debian:red rebol -qws system/tests/run-all.r --batch
 
 
   ### ARM ##############################################################
@@ -58,23 +58,22 @@ matrix:
       docker run -v ${PWD}:/red
       -w /red/quick-test/runnable/arm-tests/red/
       --entrypoint /red/quick-test/runnable/arm-tests/red/run-all.sh
-      resin/raspberry-pi2-debian:latest
-      -e LD_LIBRARY_PATH='./:/red/quick-test/runnable/arm-tests/red/'
+      balenalib/raspberry-pi2-debian:latest
     - >
       docker run -v ${PWD}:/red
+      -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
       -w /red/quick-test/runnable/arm-tests/system/
       --entrypoint /red/quick-test/runnable/arm-tests/system/run-all.sh
-      resin/raspberry-pi2-debian:latest
-      -e LD_LIBRARY_PATH='./:/red/quick-test/runnable/arm-tests/system/'
+      balenalib/raspberry-pi2-debian:latest
 
 
   ### macOS ############################################################
-  - os: osx
-    env: OS=macos
-    script:                                            # Run macOS tests
-    - rebol -qws tests/run-all.r --batch
-    - mv quick-test/quick-test.log quick-test/quick-test-red.log
-    - rebol -qws system/tests/run-all.r --batch
+#   - os: osx
+#     env: OS=macos
+#     script:                                            # Run macOS tests
+#     - rebol -qws tests/run-all.r --batch
+#     - mv quick-test/quick-test.log quick-test/quick-test-red.log
+#     - rebol -qws system/tests/run-all.r --batch
 
 
 ###### all ##############################################################
@@ -100,15 +99,15 @@ install:
     i386/debian:red rebol -qws tests/build-arm-tests.r '-t RPi' &&
     docker run -v ${PWD}:/red -w /red
     i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t RPi' &&
-    docker pull resin/raspberry-pi2-debian:latest ;
+    docker pull balenalib/raspberry-pi2-debian:latest ;
     fi
   # macOS: install rebol
-  - >
-    if [[ ${OS} == "macos" ]]; then
-    sudo curl -o /usr/local/bin/rebol
-    https://static.red-lang.org/tmp/rebol-osx &&
-    sudo chmod +x /usr/local/bin/rebol ;
-    fi
+#   - >
+#     if [[ ${OS} == "macos" ]]; then
+#     sudo curl -o /usr/local/bin/rebol
+#     https://static.red-lang.org/tmp/rebol-osx &&
+#     sudo chmod +x /usr/local/bin/rebol ;
+#     fi
 
 
 # If tests fail, change status code and save test logs into Travis logs
@@ -127,5 +126,5 @@ after_failure:
 
 
 # Notify build status
-after_script:
-  - curl ${URL}/${OS}/${STATUS}
+# after_script:
+#   - curl ${URL}/${OS}/${STATUS}
