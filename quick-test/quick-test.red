@@ -94,6 +94,7 @@ qt-init-file: func [] [
 --test--: func [
   title [string!]
 ][
+print title
   if qt-verbose [
     prin "--test-- "
     print title
