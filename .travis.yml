@@ -72,7 +72,7 @@ matrix:
       travis_wait 15 docker run -v ${PWD}:/red
       -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
       -w /red/quick-test/runnable/arm-tests/system/
-      balenalib/armv5e-debian:red sh -c "
+      balenalib/armv5e-debian sh -c "
         /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
         sleep 3 &&
         /red/quick-test/runnable/arm-tests/system/run-all.sh
@@ -124,11 +124,12 @@ install:
   # ARMel: build tests on i386
   - >
     if [[ ${OS} == "armel" ]]; then
-    printf 'FROM balenalib/armv5e-debian:latest\n
+    printf
+    'FROM balenalib/armv5e-debian:latest\n
     ENV DISPLAY :0\n
-    RUN uname -a\n
-    ' > Dockerfile;
-    cat Dockerfile;
+    RUN apt-get update &&
+    apt-get install -y libcurl4 libgtk-3-0 libgdk-pixbuf2.0-0 xvfb\n
+    ' > Dockerfile &&
     docker build -t balenalib/armv5e-debian:red . ;
     fi
   # ARMhf: build tests on i386
