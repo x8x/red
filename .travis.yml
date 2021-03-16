@@ -4,7 +4,7 @@
 #     - master
 
 #
-notifications:
+# notifications:
 #   email:
 #     # Send notifications on every build failure to comitter and author.
 #     # Never send notifications for sucessful builds.
@@ -108,7 +108,9 @@ matrix:
 install:
   # Linux: hook up qemu, build 32bit image including curl and rebol
   - >
-    if [[ ${TRAVIS_OS_NAME} == "linux" ]]; then
+   if [[ ${TRAVIS_OS_NAME} == "linux" ]]; then
+    docker run --rm --privileged
+    multiarch/qemu-user-static:register &&
     printf
     'FROM i386/debian:latest\n
     RUN apt-get update &&
