@@ -126,8 +126,8 @@ install:
     if [[ ${OS} == "armel" ]]; then
      printf 'FROM arm32v5/debian:latest\n
     ENV DISPLAY :0\n
-    RUN apt-get update && apt-get install -y libcurl4 libgtk-3-0 libgdk-pixbuf2.0-0 xvfb\n
-    ' > Dockerfile &&
+    RUN apt-get update && apt-get install -y libcurl4 xvfb\n
+    ' > Dockerfile;
     docker build -t arm32v5/debian:red . ;
     fi
   # ARMhf: build tests on i386
