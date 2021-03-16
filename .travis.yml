@@ -38,23 +38,23 @@ matrix:
 
 
   ### Linux ############################################################
-  - env: OS=linux
-    script:                                             # Run i386 tests
-    - >
-      docker run -v ${PWD}:/red -w /red
-      i386/debian:red sh -c "
-        /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
-        sleep 3 &&
-        rebol -qws tests/run-all.r --batch
-      "
-    - mv quick-test/quick-test.log quick-test/quick-test-red.log
-    - >
-      docker run -v ${PWD}:/red -w /red
-      i386/debian:red sh -c "
-        /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
-        sleep 3 &&
-        rebol -qws system/tests/run-all.r --batch
-      "
+#   - env: OS=linux
+#     script:                                             # Run i386 tests
+#     - >
+#       docker run -v ${PWD}:/red -w /red
+#       i386/debian:red sh -c "
+#         /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
+#         sleep 3 &&
+#         rebol -qws tests/run-all.r --batch
+#       "
+#     - mv quick-test/quick-test.log quick-test/quick-test-red.log
+#     - >
+#       docker run -v ${PWD}:/red -w /red
+#       i386/debian:red sh -c "
+#         /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
+#         sleep 3 &&
+#         rebol -qws system/tests/run-all.r --batch
+#       "
 
 
   ### ARMel ############################################################
@@ -63,39 +63,45 @@ matrix:
     - >
       docker run -v ${PWD}:/red
       -w /red/quick-test/runnable/arm-tests/red/
-      --entrypoint /red/quick-test/runnable/arm-tests/red/run-all.sh
-      arm32v5/debian:red
+      arm32v5/debian:redsh -c "
+        /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
+        sleep 3 &&
+        /red/quick-test/runnable/arm-tests/red/run-all.sh
+      "
     - >
       travis_wait 15 docker run -v ${PWD}:/red
       -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
       -w /red/quick-test/runnable/arm-tests/system/
-      --entrypoint /red/quick-test/runnable/arm-tests/system/run-all.sh
-      arm32v5/debian:red
+      arm32v5/debian:redsh -c "
+        /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
+        sleep 3 &&
+        /red/quick-test/runnable/arm-tests/system/run-all.sh
+      "
 
 
   ### ARMhf ############################################################
-  - env: OS=armhf
-    script:                                          # Run ARMv7hf tests
-    - >
-      docker run -v ${PWD}:/red
-      -w /red/quick-test/runnable/arm-tests/red/
-      --entrypoint /red/quick-test/runnable/arm-tests/red/run-all.sh
-      arm32v7/debian:red
-    - >
-      travis_wait 15 docker run -v ${PWD}:/red
-      -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
-      -w /red/quick-test/runnable/arm-tests/system/
-      --entrypoint /red/quick-test/runnable/arm-tests/system/run-all.sh
-      arm32v7/debian:red
+#   - env: OS=armhf
+#     script:                                          # Run ARMv7hf tests
+#     - >
+#       docker run -v ${PWD}:/red
+#       -w /red/quick-test/runnable/arm-tests/red/
+#       --entrypoint /red/quick-test/runnable/arm-tests/red/run-all.sh
+#       arm32v7/debian:red
+#     - >
+#       travis_wait 15 docker run -v ${PWD}:/red
+#       -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
+#       -w /red/quick-test/runnable/arm-tests/system/
+#       --entrypoint /red/quick-test/runnable/arm-tests/system/run-all.sh
+#       arm32v7/debian:red
 
 
   ### macOS ############################################################
-  - os: osx
-    env: OS=macos
-    script:                                            # Run macOS tests
-    - rebol -qws tests/run-all.r --batch
-    - mv quick-test/quick-test.log quick-test/quick-test-red.log
-    - rebol -qws system/tests/run-all.r --batch
+#   - os: osx
+#     env: OS=macos
+#     script:                                            # Run macOS tests
+#     - rebol -qws tests/run-all.r --batch
+#     - mv quick-test/quick-test.log quick-test/quick-test-red.log
+#     - rebol -qws system/tests/run-all.r --batch
 
 
 ###### all ##############################################################
@@ -103,8 +109,6 @@ install:
   # Linux: hook up qemu, build 32bit image including curl and rebol
   - >
     if [[ ${TRAVIS_OS_NAME} == "linux" ]]; then
-    docker run --rm --privileged
-    multiarch/qemu-user-static:register &&
     printf
     'FROM i386/debian:latest\n
     RUN apt-get update &&
@@ -114,14 +118,14 @@ install:
     ' > Dockerfile ;
     fi
   # extra libs for x86 backend, install libgtk
-  - >
-    if [[ ${OS} == "linux" ]]; then
-    printf
-    'ENV DISPLAY :0\n
-    RUN apt-get install -y libcurl4 libgtk-3-0 xvfb\n
-    ' >> Dockerfile ;
-    fi
-  # build docker image
+#   - >
+#     if [[ ${OS} == "linux" ]]; then
+#     printf
+#     'ENV DISPLAY :0\n
+#     RUN apt-get install -y libcurl4 libgtk-3-0 xvfb\n
+#     ' >> Dockerfile ;
+#     fi
+#   # build docker image
   - >
     if [[ ${TRAVIS_OS_NAME} == "linux" ]]; then
     docker build -t i386/debian:red . ;
@@ -135,32 +139,33 @@ install:
     i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t Linux-ARM' &&
     printf
     'FROM arm32v5/debian:latest\n
+    ENV DISPLAY :0\n
     RUN apt-get update &&
-    apt-get install -y libgdk-pixbuf2.0-0
+    apt-get install -y libcurl4 libgtk-3-0 libgdk-pixbuf2.0-0 xvfb\n
     ' > Dockerfile &&
     docker build -t arm32v5/debian:red . ;
     fi
   # ARMhf: build tests on i386
-  - >
-    if [[ ${OS} == "armhf" ]]; then
-    docker run -v ${PWD}:/red -w /red
-    i386/debian:red rebol -qws tests/build-arm-tests.r '-t RPi' &&
-    docker run -v ${PWD}:/red -w /red
-    i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t RPi' &&
-    printf
-    'FROM arm32v7/debian:latest\n
-    RUN apt-get update &&
-    apt-get install -y libgdk-pixbuf2.0-0
-    ' > Dockerfile &&
-    docker build -t arm32v7/debian:red . ;
-    fi
-  # macOS: install rebol
-  - >
-    if [[ ${OS} == "macos" ]]; then
-    sudo curl -o /usr/local/bin/rebol
-    https://static.red-lang.org/tmp/rebol-osx &&
-    sudo chmod +x /usr/local/bin/rebol ;
-    fi
+#   - >
+#     if [[ ${OS} == "armhf" ]]; then
+#     docker run -v ${PWD}:/red -w /red
+#     i386/debian:red rebol -qws tests/build-arm-tests.r '-t RPi' &&
+#     docker run -v ${PWD}:/red -w /red
+#     i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t RPi' &&
+#     printf
+#     'FROM arm32v7/debian:latest\n
+#     RUN apt-get update &&
+#     apt-get install -y libgdk-pixbuf2.0-0
+#     ' > Dockerfile &&
+#     docker build -t arm32v7/debian:red . ;
+#     fi
+#   # macOS: install rebol
+#   - >
+#     if [[ ${OS} == "macos" ]]; then
+#     sudo curl -o /usr/local/bin/rebol
+#     https://static.red-lang.org/tmp/rebol-osx &&
+#     sudo chmod +x /usr/local/bin/rebol ;
+#     fi
 
 
 # If tests fail, change status code and save test logs into Travis logs
