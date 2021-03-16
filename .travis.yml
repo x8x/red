@@ -124,11 +124,11 @@ install:
   # ARMel: build tests on i386
   - >
     if [[ ${OS} == "armel" ]]; then
-     printf 'FROM arm32v5/debian:latest\n
+    printf 'FROM arm32v5/debian:latest\n
     ENV DISPLAY :0\n
-    RUN apt-get update\n
-    RUN apt-get install -y curl\n
+    RUN uname -a\n
     ' > Dockerfile;
+    cat Dockerfile;
     docker build -t arm32v5/debian:red . ;
     fi
   # ARMhf: build tests on i386
