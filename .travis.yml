@@ -38,39 +38,39 @@ matrix:
 
 
   ### Linux ############################################################
-  - env: OS=linux
-    script:                                             # Run i386 tests
-    - >
-      docker run -v ${PWD}:/red -w /red
-      i386/debian:red sh -c "
-        /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
-        sleep 3 &&
-        rebol -qws tests/run-all.r --batch
-      "
-    - mv quick-test/quick-test.log quick-test/quick-test-red.log
-    - >
-      docker run -v ${PWD}:/red -w /red
-      i386/debian:red sh -c "
-        /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
-        sleep 3 &&
-        rebol -qws system/tests/run-all.r --batch
-      "
+#   - env: OS=linux
+#     script:                                             # Run i386 tests
+#     - >
+#       docker run -v ${PWD}:/red -w /red
+#       i386/debian:red sh -c "
+#         /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
+#         sleep 3 &&
+#         rebol -qws tests/run-all.r --batch
+#       "
+#     - mv quick-test/quick-test.log quick-test/quick-test-red.log
+#     - >
+#       docker run -v ${PWD}:/red -w /red
+#       i386/debian:red sh -c "
+#         /sbin/start-stop-daemon --start --quiet --background --exec /usr/bin/Xvfb &&
+#         sleep 3 &&
+#         rebol -qws system/tests/run-all.r --batch
+#       "
 
 
   ### ARMel ############################################################
-  - env: OS=armel
-    script:                                          # Run ARMv5el tests
-    - >
-      docker run -v ${PWD}:/red
-      -w /red/quick-test/runnable/arm-tests/red/
-      --entrypoint /red/quick-test/runnable/arm-tests/red/run-all.sh
-      balenalib/armv5e-debian:red
-    - >
-      travis_wait 15 docker run -v ${PWD}:/red
-      -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
-      -w /red/quick-test/runnable/arm-tests/system/
-      --entrypoint /red/quick-test/runnable/arm-tests/system/run-all.sh
-      balenalib/armv5e-debian:red
+#   - env: OS=armel
+#     script:                                          # Run ARMv5el tests
+#     - >
+#       docker run -v ${PWD}:/red
+#       -w /red/quick-test/runnable/arm-tests/red/
+#       --entrypoint /red/quick-test/runnable/arm-tests/red/run-all.sh
+#       balenalib/armv5e-debian:red
+#     - >
+#       travis_wait 15 docker run -v ${PWD}:/red
+#       -e LD_LIBRARY_PATH='$LD_LIBRARY_PATH:/red/quick-test/runnable/arm-tests/system/'
+#       -w /red/quick-test/runnable/arm-tests/system/
+#       --entrypoint /red/quick-test/runnable/arm-tests/system/run-all.sh
+#       balenalib/armv5e-debian:red
 
 
   ### ARMhf ############################################################
@@ -90,12 +90,12 @@ matrix:
 
 
   ### macOS ############################################################
-  - os: osx
-    env: OS=macos
-    script:                                            # Run macOS tests
-    - rebol -qws tests/run-all.r --batch
-    - mv quick-test/quick-test.log quick-test/quick-test-red.log
-    - rebol -qws system/tests/run-all.r --batch
+#   - os: osx
+#     env: OS=macos
+#     script:                                            # Run macOS tests
+#     - rebol -qws tests/run-all.r --batch
+#     - mv quick-test/quick-test.log quick-test/quick-test-red.log
+#     - rebol -qws system/tests/run-all.r --batch
 
 
 ###### all ##############################################################
@@ -127,19 +127,19 @@ install:
     docker build -t i386/debian:red . ;
     fi
   # ARMel: build tests on i386
-  - >
-    if [[ ${OS} == "armel" ]]; then
-    docker run -v ${PWD}:/red -w /red
-    i386/debian:red rebol -qws tests/build-arm-tests.r '-t Linux-ARM' &&
-    docker run -v ${PWD}:/red -w /red
-    i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t Linux-ARM' &&
-    printf
-    'FROM balenalib/armv5e-debian:latest\n
-    RUN apt-get update &&
-    apt-get install -y libgdk-pixbuf2.0-0
-    ' > Dockerfile &&
-    docker build -t balenalib/armv5e-debian:red . ;
-    fi
+#   - >
+#     if [[ ${OS} == "armel" ]]; then
+#     docker run -v ${PWD}:/red -w /red
+#     i386/debian:red rebol -qws tests/build-arm-tests.r '-t Linux-ARM' &&
+#     docker run -v ${PWD}:/red -w /red
+#     i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t Linux-ARM' &&
+#     printf
+#     'FROM balenalib/armv5e-debian:latest\n
+#     RUN apt-get update &&
+#     apt-get install -y libgdk-pixbuf2.0-0
+#     ' > Dockerfile &&
+#     docker build -t balenalib/armv5e-debian:red . ;
+#     fi
   # ARMhf: build tests on i386
   - >
     if [[ ${OS} == "armhf" ]]; then
@@ -148,19 +148,19 @@ install:
     docker run -v ${PWD}:/red -w /red
     i386/debian:red rebol -qws system/tests/build-arm-tests.r '-t RPi' &&
     printf
-    'FROM balenalib/raspberrypi3-debian:latest\n
+    'FROM balenalib/raspberrypi3-debian:jessie\n
     RUN apt-get update &&
     apt-get install -y libgdk-pixbuf2.0-0
     ' > Dockerfile &&
     docker build -t balenalib/raspberrypi3-debian:red . ;
     fi
   # macOS: install rebol
-  - >
-    if [[ ${OS} == "macos" ]]; then
-    sudo curl -o /usr/local/bin/rebol
-    https://static.red-lang.org/tmp/rebol-osx &&
-    sudo chmod +x /usr/local/bin/rebol ;
-    fi
+#   - >
+#     if [[ ${OS} == "macos" ]]; then
+#     sudo curl -o /usr/local/bin/rebol
+#     https://static.red-lang.org/tmp/rebol-osx &&
+#     sudo chmod +x /usr/local/bin/rebol ;
+#     fi
 
 
 # If tests fail, change status code and save test logs into Travis logs
